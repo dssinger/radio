@@ -1,13 +1,9 @@
+#!/usr/bin/python
 import sys, pygame
-from pygame.locals import *
 import time
 import subprocess
 import os
 import glob
-os.environ["SDL_FBDEV"] = "/dev/fb1"
-os.environ["SDL_MOUSEDEV"] = "/dev/input/touchscreen"
-os.environ["SDL_MOUSEDRV"] = "TSLIB"
-pygame.init()
 
 
 #define function that checks for mouse location
@@ -106,42 +102,11 @@ def button(number):
 		refresh_menu_screen()	
 
 def refresh_menu_screen():
-#set up the fixed items on the menu
-	screen.fill(white) #change the colours if needed
-	font=pygame.font.Font(None,24)
-	title_font=pygame.font.Font(None,34)
-	station_font=pygame.font.Font(None,20)
-	label=title_font.render("MPC RADIO", 1, (blue))
-	label2=font.render("Streaming Internet Radio", 1, (red))
-	screen.blit(label,(105, 15))
-	screen.blit(label2,(88, 45))
-	play=pygame.image.load("play.tiff")
-	pause=pygame.image.load("pause.tiff")
-	refresh=pygame.image.load("refresh.tiff")
-	previous=pygame.image.load("previous.tiff")
-	next=pygame.image.load("next.tiff")
-	vol_down=pygame.image.load("volume_down.tiff")
-	vol_up=pygame.image.load("volume_up.tiff")
-	mute=pygame.image.load("mute.png")
-	exit=pygame.image.load("exit.tiff")
-	radio=pygame.image.load("radio.tiff")
-	# draw the main elements on the screen
-	screen.blit(play,(20,80))	
-	screen.blit(pause,(80,80))
-	pygame.draw.rect(screen, red, (8, 70, 304, 108),1)
-	pygame.draw.line(screen, red, (8,142),(310,142),1)
-	pygame.draw.rect(screen, cream, (10, 143, 300, 33),0)
-	screen.blit(refresh,(270,70))
-	screen.blit(previous,(10,180))
-	screen.blit(next,(70,180))
-        screen.blit(vol_down,(130,180))
-	screen.blit(vol_up,(190,180))
-	screen.blit(mute,(250,180))	
-        screen.blit(exit,(270,5))
-	screen.blit(radio,(2,1))
-	pygame.draw.rect(screen, blue, (0,0,320,240),3)
-	##### display the station name and split it into 2 parts : 
+# Eventually, this will generate HTML, but for now, it just prints.
+  
+        print 'to mpc current'
 	station = subprocess.check_output("mpc current", shell=True )
+        print 'and back'
 	lines=station.split(":")
 	length = len(lines) 
 	if length==1:
@@ -158,22 +123,16 @@ def refresh_menu_screen():
 	if line1 =="":
 		line2 = "Press PLAY or REFRESH"
 		station_status = "stopped"
-		status_font = red
 	else:
 		station_status = "playing"
-		status_font = green
-	station_name=station_font.render(line1, 1, (red))
-	additional_data=station_font.render(line2, 1, (blue))
-	station_label=title_font.render(station_status, 1, (status_font))
-	screen.blit(station_label,(175,100))
-	screen.blit(station_name,(13,145))
-	screen.blit(additional_data,(12,160))
+        station_name = line1
+        additional_data = line2
+        print station_name + '\n' + additional_data + '\n' + station_status 
 	######## add volume number
 	volume = subprocess.check_output("mpc volume", shell=True )
 	volume = volume[8:]
 	volume = volume[:-1]
-	volume_tag=font.render(volume, 1, (black))
-	screen.blit(volume_tag,(175,75))
+        print volume
 	####### check to see if the Radio is connected to the internet
 	IP = subprocess.check_output("hostname -I", shell=True )
 	IP=IP[:3]
@@ -185,34 +144,20 @@ def refresh_menu_screen():
 		network_status = "offline"
 		status_font = red
 
-	network_status_label = font.render(network_status, 1, (status_font))
-	screen.blit(network_status_label, (215,75))
-	pygame.display.flip()
-	
+        print network_status
+        print	
+
+
+
 def main():
         while 1:
-                for event in pygame.event.get():
-                        if event.type == pygame.MOUSEBUTTONDOWN:
-                                print "screen pressed" #for debugging purposes
-                                pos = (pygame.mouse.get_pos() [0], pygame.mouse.get_pos() [1])
-                                print pos #for checking
-                                pygame.draw.circle(screen, white, pos, 2, 0) #for debugging purposes - adds a small dot where the screen is pressed
-                                on_click()
-
-#ensure there is always a safe way to end the program if the touch screen fails
-
-                        if event.type == KEYDOWN:
-                                if event.key == K_ESCAPE:
-                                        sys.exit()
-        time.sleep(0.2)        
-	pygame.display.update()
-
+          time.sleep(0.2)        
+          break
 
 #################### EVERTHING HAS NOW BEEN DEFINED ###########################
 
 #set size of the screen
 size = width, height = 320, 240
-screen = pygame.display.set_mode(size)
 
 #define colours
 blue = 26, 0, 255
@@ -224,5 +169,4 @@ red = 255, 0, 0
 green = 0, 255, 0
 refresh_menu_screen()  #refresh the menu interface 
 main() #check for key presses and start emergency exit
-station_name()
 
