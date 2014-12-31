@@ -33,12 +33,15 @@ class mysock:
           if len(chunk) == 0:
               ret = self.recvbuf
               self.recvbuf = ''
+              print 'eot'
               return ret
           self.recvbuf += chunk
      # We have at least one line in the buffer.  Return it.
      (ret, self.recvbuf) = self.recvbuf.split('\n', 1)
      return ret
     
+class mpdsock(mysock):
+   
 
    def readresp(self):
       """ Reads lines until "OK" or "ACK"  """
@@ -61,7 +64,7 @@ def sendcommands(s, clist):
 # Let's create two sockets to begin with:
 # s is the socket we'll use to control mpd
 # serv is the socket we'll be pinged on if something exciting happens in the world
-s = mysock()
+s = mpdsock()
 s.connect("localhost", 6600)
 s.readline()   # Throw away the initial 'ok'
 
@@ -70,23 +73,36 @@ for item in sendcommands(s, ['status', 'playlistinfo']):
     print '======'
 
 
-serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serv.bind(('localhost', 6601))
-serv.listen(5)
+serv = mysock()
+
+serv.sock.bind(('localhost', 6601))
+serv.sock.listen(5)
 
 # Wait for something interesting to happen
 readers = []
 writers = []
 oops = []
+readlist = [s.sock, serv.sock]
+writelist = []
 
-while not readers:
-    readers, writers, oops = select.select([s.sock, serv], [], [], 20)
-    print 'tick'
+def handle_mpd_message(s):
+    print 'Incoming from MPD'
+    print '\n'.join(s.readresp())
+    s.sock.send('idle\n')    
+    print '--'
 
-if s.sock in readers:
-   print 'something from mpd'
-   print '\n'.join(s.readresp())
+while 1:
+    while not readers:
+        readers, writers, oops = select.select(readlist, writelist, [], 20)
+        print 'tick'
 
-if serv in readers:
-   print 'a connection'
+
+    if s.sock in readers:
+       handle_mpd_message(s)
+       readers.remove(s.sock)
+
+    if serv.sock in readers:
+       print 'incoming connection'
+       readers.remove(serv.sock)
+       serv.sock.accept()
 
