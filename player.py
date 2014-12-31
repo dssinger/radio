@@ -22,10 +22,9 @@ class mysock:
 
     def connect(self, host, port):
         self.sock.connect((host, port))
-        self.sock.setblocking(0)  # So we can wait for idles....
+        #self.sock.setblocking(0)  # So we can wait for idles....
 
     def send(self, msg):
-        print 'sending "%s"' % msg
         totalsent = 0
         msglen = len(msg)
         while totalsent < msglen:
@@ -33,7 +32,6 @@ class mysock:
             if sent == 0:
                 raise RuntimeError('socket connection broken')
             totalsent += sent
-            print 'sent %d bytes, total %d' % (sent, totalsent)
 
     def readline(self):
         """ Receives one line at a time """
@@ -41,10 +39,12 @@ class mysock:
         while '\n' not in self.recvbuf:
             chunk = self.sock.recv(2048)
             if len(chunk) == 0:
-                ret = self.recvbuf
-                self.recvbuf = ''
-                print 'eot'
-                return ret
+                if self.recvbuf:
+                    ret = self.recvbuf
+                    self.recvbuf = ''
+                    return ret
+                else:
+                    raise RuntimeError('incoming socket broken')
             self.recvbuf += chunk
 
      # We have at least one line in the buffer.  Return it.
@@ -72,7 +72,7 @@ class mpdsock(mysock):
         res = []
         for c in clist:
             self.send(c.rstrip() + '\n')
-        res.append(self.readresp())
+            res.append(self.readresp())
         return res
 
     def idle(self):
@@ -123,8 +123,6 @@ while 1:
                 [], 20)
         if not readers:
             print 'tick'
-
-    print len(readers), 'available to read'
 
     if s.sock in readers:
         handle_mpd_message(s)
