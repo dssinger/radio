@@ -18,6 +18,7 @@ class mysock:
       self.sock.setblocking(0)    # So we can wait for idles....
 
    def send(self, msg):
+      print 'sending "%s"' % msg
       totalsent = 0
       msglen = len(msg)
       while totalsent < msglen:
@@ -25,6 +26,7 @@ class mysock:
           if sent == 0:
               raise RuntimeError("socket connection broken")
           totalsent += sent
+          print "sent %d bytes, total %d" % (sent, totalsent)
     
    def readline(self):
      """ Receives one line at a time """
@@ -51,15 +53,17 @@ class mpdsock(mysock):
           ans.append(self.readline())
       return ans      
 
-def sendcommands(s, clist):
-   """ Send a list of commands to the server, finishing with 'idle' 
-       Return all responses in a list """
-   res = []
-   for c in clist:
-     s.send(c.rstrip() + '\n')
-     res.append(s.readresp())
-   s.send('idle\n')
-   return res
+   def sendcommands(self, clist):
+      """ Send a list of commands to the server
+          Return all responses in a list """
+      res = []
+      for c in clist:
+        self.send(c.rstrip() + '\n')
+      res.append(self.readresp())
+      return res
+
+   def idle(self):
+      self.send('idle\n')
 
 # Let's create two sockets to begin with:
 # s is the socket we'll use to control mpd
@@ -68,9 +72,11 @@ s = mpdsock()
 s.connect("localhost", 6600)
 s.readline()   # Throw away the initial 'ok'
 
-for item in sendcommands(s, ['status', 'playlistinfo']):
+for item in s.sendcommands(['status', 'playlistinfo']):
     print '\n'.join(item)
     print '======'
+
+s.idle()
 
 
 serv = mysock()
@@ -87,15 +93,20 @@ writelist = []
 
 def handle_mpd_message(s):
     print 'Incoming from MPD'
-    print '\n'.join(s.readresp())
-    s.sock.send('idle\n')    
+    ret = '\n'.join(s.readresp())
+    if ret:
+       print ret
+       s.idle()
     print '--'
 
 while 1:
     while not readers:
+        print 'select'
         readers, writers, oops = select.select(readlist, writelist, [], 20)
-        print 'tick'
+        if not readers:
+            print 'tick'
 
+    print len(readers), 'available to read'
 
     if s.sock in readers:
        handle_mpd_message(s)
