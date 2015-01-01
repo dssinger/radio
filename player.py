@@ -21,8 +21,9 @@ class mysock:
         self.recvbuf = ''
 
     def connect(self, host, port):
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.connect((host, port))
-        #self.sock.setblocking(0)  # So we can wait for idles....
+        self.sock.setblocking(0)  # So we can wait for idles....
 
     def send(self, msg):
         totalsent = 0
@@ -100,7 +101,7 @@ serv.sock.bind(('localhost', 6601))
 serv.sock.listen(5)
 
 x10 = mysock()
-x10.sock.connect(('localhost', 1099))
+x10.connect('localhost', 1099)
 
 
 # Wait for something interesting to happen
@@ -136,8 +137,8 @@ while 1:
         readers.remove(s.sock)
 
     if x10.sock in readers:
-        handle_x10_message(s)
-        readers.remove(s.sock)
+        handle_x10_message(x10)
+        readers.remove(x10.sock)
 
     if serv.sock in readers:
         print 'incoming connection'
