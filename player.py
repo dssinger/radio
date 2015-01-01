@@ -82,6 +82,7 @@ class mpdsock(mysock):
 # Let's create two sockets to begin with:
 # s is the socket we'll use to control mpd
 # serv is the socket we'll be pinged on if something exciting happens in the world
+# x10 is the socket to use with mochad
 
 s = mpdsock()
 s.connect('localhost', 6600)
@@ -98,12 +99,16 @@ serv = mysock()
 serv.sock.bind(('localhost', 6601))
 serv.sock.listen(5)
 
+x10 = mysock()
+x10.sock.connect(('localhost', 1099))
+
+
 # Wait for something interesting to happen
 
 readers = []
 writers = []
 oops = []
-readlist = [s.sock, serv.sock]
+readlist = [s.sock, serv.sock, x10.sock]
 writelist = []
 
 
@@ -115,6 +120,8 @@ def handle_mpd_message(s):
         s.idle()
     print '--'
 
+def handle_x10_message(s):
+    print 'x10: ', s.readline()
 
 while 1:
     while not readers:
@@ -126,6 +133,10 @@ while 1:
 
     if s.sock in readers:
         handle_mpd_message(s)
+        readers.remove(s.sock)
+
+    if x10.sock in readers:
+        handle_x10_message(s)
         readers.remove(s.sock)
 
     if serv.sock in readers:
