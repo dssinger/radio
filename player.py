@@ -20,10 +20,18 @@ class mysock:
 
         self.recvbuf = ''
 
-    def connect(self, host, port):
+    def connect(self, otherend):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.connect((host, port))
+        self.sock.connect(otherend)
         self.sock.setblocking(0)  # So we can wait for idles....
+
+    def bind(self, otherend):
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(otherend)
+        self.sock.setblocking(0)  # So we can wait for idles....
+
+    def listen(self, count):
+        self.sock.listen(count)
 
     def send(self, msg):
         totalsent = 0
@@ -86,7 +94,7 @@ class mpdsock(mysock):
 # x10 is the socket to use with mochad
 
 s = mpdsock()
-s.connect('localhost', 6600)
+s.connect(('localhost', 6600))
 s.readline()  # Throw away the initial 'ok'
 
 for item in s.sendcommands(['status', 'playlistinfo']):
@@ -97,11 +105,11 @@ s.idle()
 
 serv = mysock()
 
-serv.sock.bind(('localhost', 6601))
-serv.sock.listen(5)
+serv.bind(('localhost', 6601))
+serv.listen(5)
 
 x10 = mysock()
-x10.connect('localhost', 1099)
+x10.connect(('localhost', 1099))
 
 
 # Wait for something interesting to happen
