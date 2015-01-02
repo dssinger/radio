@@ -11,14 +11,16 @@ class mysock:
 
     """ Wraps a raw socket with convenience buffering functions """
 
-    def __init__(self, sock=None):
+    def __init__(self, sock=None, reader=None):
         if sock is None:
             self.sock = socket.socket(socket.AF_INET,
                     socket.SOCK_STREAM)
         else:
             self.sock = sock
-
         self.recvbuf = ''
+        self.reader = reader
+
+   
 
     def connect(self, otherend):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -87,39 +89,7 @@ class mpdsock(mysock):
     def idle(self):
         self.send('idle\n')
 
-
-# Let's create two sockets to begin with:
-# s is the socket we'll use to control mpd
-# serv is the socket we'll be pinged on if something exciting happens in the world
-# x10 is the socket to use with mochad
-
-s = mpdsock()
-s.connect(('localhost', 6600))
-s.readline()  # Throw away the initial 'ok'
-
-for item in s.sendcommands(['status', 'playlistinfo']):
-    print '\n'.join(item)
-    print '======'
-
-s.idle()
-
-serv = mysock()
-
-serv.bind(('localhost', 6601))
-serv.listen(5)
-
-x10 = mysock()
-x10.connect(('localhost', 1099))
-
-
-# Wait for something interesting to happen
-
-readers = []
-writers = []
-oops = []
-readlist = [s.sock, serv.sock, x10.sock]
-writelist = []
-
+# Define the handlers for reads.  
 
 def handle_mpd_message(s):
     print 'Incoming from MPD'
@@ -132,6 +102,48 @@ def handle_mpd_message(s):
 def handle_x10_message(s):
     print 'x10: ', s.readline()
 
+def handle_incoming_connection(s):
+    print 'incoming'
+    s.sock.accept()
+
+# Let's create sockets to begin with:
+# mpd is the socket we'll use to control mpd
+# serv is the socket we'll be pinged on if something exciting happens in the world; we'll create new sockets for it.
+# x10 is the socket to use with mochad
+
+mpd = mpdsock(reader=handle_mpd_message)
+mpd.connect(('localhost', 6600))
+mpd.readline()  # Throw away the initial 'ok'
+
+for item in mpd.sendcommands(['status', 'playlistinfo']):
+    print '\n'.join(item)
+    print '======'
+
+mpd.idle()
+
+serv = mysock(reader=handle_incoming_connection)
+serv.bind(('localhost', 6601))
+serv.listen(5)
+
+x10 = mysock(reader=handle_x10_message)
+x10.connect(('localhost', 1099))
+
+
+# Wait for something interesting to happen
+
+readers = []
+writers = []
+oops = []
+myreadlist = [mpd, serv, x10]
+finders = {}
+readlist = []
+for x in myreadlist:
+    finders[x.sock] = x
+    readlist.append(x.sock)
+
+writelist = []
+
+
 while 1:
     while not readers:
         print 'select'
@@ -140,18 +152,13 @@ while 1:
         if not readers:
             print 'tick'
 
-    if s.sock in readers:
-        handle_mpd_message(s)
-        readers.remove(s.sock)
+    for sock in readers:
+        mys = finders[sock]
+        if mys.reader:
+           mys.reader(mys)
+        readers.remove(sock)
+        
 
-    if x10.sock in readers:
-        handle_x10_message(x10)
-        readers.remove(x10.sock)
-
-    if serv.sock in readers:
-        print 'incoming connection'
-        readers.remove(serv.sock)
-        serv.sock.accept()
 
 
 			
