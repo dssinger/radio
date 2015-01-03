@@ -64,31 +64,6 @@ class mysock:
         return ret
 
 
-class mpdsock(mysock):
-
-    def readresp(self):
-        """ Reads lines until "OK" or "ACK"  """
-
-        ans = []
-        ans.append(self.readline())
-        while ans[-1] != '' and ans[-1] != 'OK' \
-            and not ans[-1].startswith('ACK '):
-            ans.append(self.readline())
-        return ans
-
-    def sendcommands(self, clist):
-        """ Send a list of commands to the server
-          Return all responses in a list """
-
-        res = []
-        for c in clist:
-            self.send(c.rstrip() + '\n')
-            res.append(self.readresp())
-        return res
-
-    def idle(self):
-        self.send('idle\n')
-
 # Define the handlers for reads.  
 
 class Mpdinfo:
@@ -101,6 +76,7 @@ class Mpdinfo:
         self.sock = mysock(reader=self.handleidleresp)    # Must be a "mysock"
         self.send = self.sock.send   #  Jam in convenience methods
         self.readline = self.sock.readline   # Jam in convenience methods
+        self.inidle = False
         self.sock.connect(('localhost', 6600))
         self.readline()    # Throw away MPD's welcome message
         self.getstatus()
@@ -119,24 +95,21 @@ class Mpdinfo:
             ans.append(self.readline())
         return ans[:-1]
 
-    def sendcommands(self, clist):
-        """ Send a list of commands to the server
-          Return all responses in a list """
-
-        res = []
-        for c in clist:
-            self.send(c.rstrip() + '\n')
-            res.append(self.readresp())
-        return res
+    def noidle(self):
+        if self.inidle:
+            self.send('noidle\n')
+            self.inidle = False
 
     def idle(self):
         self.send('idle\n')
+        self.inidle = True
 
     def parsepair(self, line):
         (item, value) = line.split(':', 1)
         return (item.strip(), value.strip())
 
     def getstatus(self):
+        self.noidle()
         self.send("status\n")
         self.status = {}
         for l in self.readresp():
@@ -145,11 +118,11 @@ class Mpdinfo:
             self.status[item] = value
 
     def getplaylistinfo(self):
+        self.noidle()
         self.send("playlistinfo\n")
         # We get back a set of file/title/Pos/ID/Name lines.
         playlist = []
         for line in self.readresp():
-            print 'pli: %s' % line
             (item, value) = self.parsepair(line)
             if item == 'file':
                 playlist.append(Station(value))
@@ -162,6 +135,7 @@ class Mpdinfo:
         self.playlist = playlist
 
     def handleidleresp(self, sock):
+        self.inidle = False
         updates = {}
         for line in self.readresp():
            updates[line] = True
@@ -254,7 +228,7 @@ while 1:
         if mys.reader:
            mys.reader(mys)
         readers.remove(sock)
-
+   
     print mpdinfo
         
 
