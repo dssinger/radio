@@ -107,7 +107,7 @@ class Mpdinfo:
         self.getplaylistinfo()
 
     def __repr__(self):
-        return self.status   # for now
+        return '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
          
     def readresp(self):
         """ Reads lines until "OK" or "ACK"  """
@@ -117,7 +117,7 @@ class Mpdinfo:
         while ans[-1] != '' and ans[-1] != 'OK' \
             and not ans[-1].startswith('ACK '):
             ans.append(self.readline())
-        return ans
+        return ans[:-1]
 
     def sendcommands(self, clist):
         """ Send a list of commands to the server
@@ -140,14 +140,16 @@ class Mpdinfo:
         self.send("status\n")
         self.status = {}
         for l in self.readresp():
+            print l
             (item, value) = self.parsepair(l)
             self.status[item] = value
 
     def getplaylistinfo(self):
-        self.send("playlistinfo")
+        self.send("playlistinfo\n")
         # We get back a set of file/title/Pos/ID/Name lines.
         playlist = []
-        while line in self.readresp():
+        for line in self.readresp():
+            print 'pli: %s' % line
             (item, value) = self.parsepair(line)
             if item == 'file':
                 playlist.append(Station(value))
@@ -199,12 +201,14 @@ class Station:
  
         
 
-def handle_x10_message(mpdinfo, s):
+def handle_x10_message(s):
     print 'x10: ', s.readline()
 
-def handle_incoming_connection(mpdinfo, s):
+def handle_incoming_connection(s):
     print 'incoming'
-    s.sock.accept()
+    (news, addr) = s.sock.accept()
+    news.send('go away')
+        
 
 # Let's create sockets to begin with:
 # mpd is the socket we'll use to control mpd
@@ -248,8 +252,10 @@ while 1:
     for sock in readers:
         mys = finders[sock]
         if mys.reader:
-           mys.reader(mpdinfo, mys)
+           mys.reader(mys)
         readers.remove(sock)
+
+    print mpdinfo
         
 
 
