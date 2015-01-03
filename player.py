@@ -64,7 +64,7 @@ class mysock:
         return ret
 
 
-class Mpdsock(mysock):
+class mpdsock(mysock):
 
     def readresp(self):
         """ Reads lines until "OK" or "ACK"  """
@@ -91,7 +91,7 @@ class Mpdsock(mysock):
 
 # Define the handlers for reads.  
 
-class mpdinfo:
+class Mpdinfo:
     """ Information about the current status of the MPD player.
         We don't care about the MPD database, since we're handling
         streaming audio only.
@@ -101,7 +101,7 @@ class mpdinfo:
         self.sock = mysock(reader=self.handleidleresp)    # Must be a "mysock"
         self.send = self.sock.send   #  Jam in convenience methods
         self.readline = self.sock.readline   # Jam in convenience methods
-        self.sock.connect((localhost, 6600))
+        self.sock.connect(('localhost', 6600))
         self.readline()    # Throw away MPD's welcome message
         self.getstatus()
         self.getplaylistinfo()
@@ -165,7 +165,7 @@ class mpdinfo:
            updates[line] = True
         if 'player' in updates:
             self.getstatus()
-        if 'playlist' in updates
+        if 'playlist' in updates:
             self.getplaylistinfo()
         self.idle()
 
