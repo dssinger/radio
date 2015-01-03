@@ -64,7 +64,7 @@ class mysock:
         return ret
 
 
-class mpdsock(mysock):
+class Mpdsock(mysock):
 
     def readresp(self):
         """ Reads lines until "OK" or "ACK"  """
@@ -91,18 +91,118 @@ class mpdsock(mysock):
 
 # Define the handlers for reads.  
 
-def handle_mpd_message(s):
-    print 'Incoming from MPD'
-    ret = '\n'.join(s.readresp())
-    if ret:
-        print ret
-        s.idle()
-    print '--'
+class mpdinfo:
+    """ Information about the current status of the MPD player.
+        We don't care about the MPD database, since we're handling
+        streaming audio only.
+    """
 
-def handle_x10_message(s):
+    def __init__(self):
+        self.sock = mysock(reader=self.handleidleresp)    # Must be a "mysock"
+        self.send = self.sock.send   #  Jam in convenience methods
+        self.readline = self.sock.readline   # Jam in convenience methods
+        self.sock.connect((localhost, 6600))
+        self.readline()    # Throw away MPD's welcome message
+        self.getstatus()
+        self.getplaylistinfo()
+
+    def __repr__(self):
+        return self.status   # for now
+         
+    def readresp(self):
+        """ Reads lines until "OK" or "ACK"  """
+
+        ans = []
+        ans.append(self.readline())
+        while ans[-1] != '' and ans[-1] != 'OK' \
+            and not ans[-1].startswith('ACK '):
+            ans.append(self.readline())
+        return ans
+
+    def sendcommands(self, clist):
+        """ Send a list of commands to the server
+          Return all responses in a list """
+
+        res = []
+        for c in clist:
+            self.send(c.rstrip() + '\n')
+            res.append(self.readresp())
+        return res
+
+    def idle(self):
+        self.send('idle\n')
+
+    def parsepair(self, line):
+        (item, value) = line.split(':', 1)
+        return (item.strip(), value.strip())
+
+    def getstatus(self):
+        self.send("status\n")
+        self.status = {}
+        for l in self.readresp():
+            (item, value) = self.parsepair(l)
+            self.status[item] = value
+
+    def getplaylistinfo(self):
+        self.send("playlistinfo")
+        # We get back a set of file/title/Pos/ID/Name lines.
+        playlist = []
+        while line in self.readresp():
+            (item, value) = self.parsepair(line)
+            if item == 'file':
+                playlist.append(Station(value))
+            elif item == 'Name':
+                playlist[-1].name = value
+            elif item == 'Pos':
+                playlist[-1].pos = int(value)
+            elif item == 'Title':
+                playlist[-1].title = value
+        self.playlist = playlist
+
+    def handleidleresp(self, sock):
+        updates = {}
+        for line in self.readresp():
+           updates[line] = True
+        if 'player' in updates:
+            self.getstatus()
+        if 'playlist' in updates
+            self.getplaylistinfo()
+        self.idle()
+
+
+class Station:
+    stations = {}
+    def __init__(self, file):
+        self.file = file
+        self.name = ''
+        self.pos = None
+        self.title = ''
+        self.stations[file] = self
+
+    def __repr__(self):
+        return self.file + '\n  ' + self.name + '\   ' + self.title
+  
+    @classmethod
+    def find(self, file):
+        if file in self.stations:
+            return self.stations[file]
+        else:
+            return self.__init__(file)
+
+    def setname(self, name):
+        self.name = name
+
+    def settitle(self, title):
+        self.title = title
+
+        
+ 
+        
+
+def handle_x10_message(mpdinfo, s):
     print 'x10: ', s.readline()
 
-def handle_incoming_connection(s):
+def handle_incoming_connection(mpdinfo, s):
     print 'incoming'
     s.sock.accept()
 
@@ -111,15 +211,8 @@ def handle_incoming_connection(s):
 # serv is the socket we'll be pinged on if something exciting happens in the world; we'll create new sockets for it.
 # x10 is the socket to use with mochad
 
-mpd = mpdsock(reader=handle_mpd_message)
-mpd.connect(('localhost', 6600))
-mpd.readline()  # Throw away the initial 'ok'
-
-for item in mpd.sendcommands(['status', 'playlistinfo']):
-    print '\n'.join(item)
-    print '======'
-
-mpd.idle()
+mpdinfo = Mpdinfo()
+mpdinfo.idle()
 
 serv = mysock(reader=handle_incoming_connection)
 serv.bind(('localhost', 6601))
@@ -134,7 +227,7 @@ x10.connect(('localhost', 1099))
 readers = []
 writers = []
 oops = []
-myreadlist = [mpd, serv, x10]
+myreadlist = [mpdinfo.sock, serv, x10]
 finders = {}
 readlist = []
 for x in myreadlist:
@@ -155,7 +248,7 @@ while 1:
     for sock in readers:
         mys = finders[sock]
         if mys.reader:
-           mys.reader(mys)
+           mys.reader(mpdinfo, mys)
         readers.remove(sock)
         
 
