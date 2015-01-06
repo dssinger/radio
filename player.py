@@ -104,9 +104,11 @@ class MPDController:
         return ans[:-1]
 
     def noidle(self):
+        was = self.inidle
         if self.inidle:
             self.send('noidle\n')
             self.inidle = False
+        return was
 
     def idle(self):
         self.send('idle\n')
@@ -117,16 +119,18 @@ class MPDController:
         return (item.strip(), value.strip())
 
     def getstatus(self):
-        self.noidle()
+        was = self.noidle()
         self.send("status\n")
         self.status = {}
         for l in self.readresp():
             print l
             (item, value) = self.parsepair(l)
             self.status[item] = value
+        if was:
+            self.idle()
 
     def getplaylistinfo(self):
-        self.noidle()
+        was = self.noidle()
         self.send("playlistinfo\n")
         # We get back a set of file/title/Pos/ID/Name lines.
         playlist = []
@@ -141,6 +145,8 @@ class MPDController:
             elif item == 'Title':
                 playlist[-1].title = value
         self.playlist = playlist
+        if was:
+            self.idle()
 
     def getcurrent(self):
         ix = int(self.status['song'])
