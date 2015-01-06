@@ -123,7 +123,7 @@ class MPDController:
         self.send("status\n")
         self.status = {}
         for l in self.readresp():
-            print l
+            # print l
             (item, value) = self.parsepair(l)
             self.status[item] = value
         if was:
