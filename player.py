@@ -198,7 +198,7 @@ mpdinfo = Mpdinfo()
 mpdinfo.idle()
 
 serv = mysock(reader=handle_incoming_connection)
-serv.bind(('localhost', MYPORT))
+serv.bind(('0.0.0.0', MYPORT))
 serv.listen(5)
 
 #x10 = mysock(reader=handle_x10_message)
