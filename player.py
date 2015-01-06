@@ -1,11 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-""" Player: the all-singing, all-dancing Raspberry Pi MPD client """
+""" Player: the all-singing, all-dancing Raspberry Pi MPD client
+    Connects to MPD and provides a simplified interface to it.
+    Accepts commands on port 6601, always responds with current player 
+       status.
+
+"""
+
 
 import socket
 import select
-
+MYPORT = 6601
 
 class mysock:
 
@@ -175,8 +181,8 @@ class Station:
  
         
 
-def handle_x10_message(s):
-    print 'x10: ', s.readline()
+#def handle_x10_message(s):
+#    print 'x10: ', s.readline()
 
 def handle_incoming_connection(s):
     print 'incoming'
@@ -187,17 +193,16 @@ def handle_incoming_connection(s):
 # Let's create sockets to begin with:
 # mpd is the socket we'll use to control mpd
 # serv is the socket we'll be pinged on if something exciting happens in the world; we'll create new sockets for it.
-# x10 is the socket to use with mochad
 
 mpdinfo = Mpdinfo()
 mpdinfo.idle()
 
 serv = mysock(reader=handle_incoming_connection)
-serv.bind(('localhost', 6601))
+serv.bind(('localhost', MYPORT))
 serv.listen(5)
 
-x10 = mysock(reader=handle_x10_message)
-x10.connect(('localhost', 1099))
+#x10 = mysock(reader=handle_x10_message)
+#x10.connect(('localhost', 1099))
 
 
 # Wait for something interesting to happen
@@ -205,7 +210,7 @@ x10.connect(('localhost', 1099))
 readers = []
 writers = []
 oops = []
-myreadlist = [mpdinfo.sock, serv, x10]
+myreadlist = [mpdinfo.sock, serv]
 finders = {}
 readlist = []
 for x in myreadlist:
