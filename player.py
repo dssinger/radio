@@ -93,7 +93,6 @@ class MPDController:
         self.readline()    # Throw away MPD's welcome message
         self.getstatus()
         self.getplaylistinfo()
-        self.getcurrent()
 
     def __repr__(self):
         ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
@@ -152,12 +151,10 @@ class MPDController:
             elif item == 'Title':
                 playlist[-1].title = value
         self.playlist = playlist
+        self.current = repr(self.playlist[int(self.status['song'])])
         if was:
             self.idle()
 
-    def getcurrent(self):
-        ix = int(self.status['song'])
-        self.current = repr(self.playlist[ix])
 
 
     def handleidleresp(self, sock):
