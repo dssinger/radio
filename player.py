@@ -11,6 +11,7 @@
 
 import socket
 import select
+import time
 MYPORT = 6601
 
 class mysocket:
@@ -85,9 +86,12 @@ class MPDController:
         self.readline()    # Throw away MPD's welcome message
         self.getstatus()
         self.getplaylistinfo()
+        self.getcurrent()
 
     def __repr__(self):
-        return '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
+        ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
+        ret += '\n' + self.current
+        return ret
          
     def readresp(self):
         """ Reads lines until "OK" or "ACK"  """
@@ -138,6 +142,11 @@ class MPDController:
                 playlist[-1].title = value
         self.playlist = playlist
 
+    def getcurrent(self):
+        ix = int(self.status['song'])
+        self.current = repr(self.playlist[ix])
+
+
     def handleidleresp(self, sock):
         self.inidle = False
         updates = {}
@@ -160,7 +169,7 @@ class Station:
         self.stations[file] = self
 
     def __repr__(self):
-        return self.file + '\n  ' + self.name + '\   ' + self.title
+        return self.file + '\n  ' + self.name + '\n  ' + self.title
   
     @classmethod
     def find(self, file):
@@ -222,6 +231,7 @@ while 1:
            mys.reader(mys)
         readers.remove(sock)
    
+    print time.asctime()
     print mpdcontroller
         
 
