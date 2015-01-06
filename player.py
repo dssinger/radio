@@ -113,6 +113,7 @@ class MPDController:
         was = self.inidle
         if self.inidle:
             self.send('noidle\n')
+            self.readresp()  # Consume the response to noidle!
             self.inidle = False
         return was
 
@@ -129,7 +130,6 @@ class MPDController:
         self.send("status\n")
         self.status = {}
         for l in self.readresp():
-            # print l
             (item, value) = self.parsepair(l)
             self.status[item] = value
         if was:
@@ -155,6 +155,9 @@ class MPDController:
         if was:
             self.idle()
 
+    def update(self):
+        self.getstatus()
+        self.getplaylistinfo()
 
 
     def handleidleresp(self, sock):
@@ -200,7 +203,9 @@ class Station:
 def handle_incoming_connection(s):
     print 'incoming'
     (news, addr) = s.socket.accept()
-    news.send('go away')
+    mpdcontroller.update()
+    news.send(repr(mpdcontroller))
+    news.send('\n')
 
 # Let's create sockets to begin with:
 # mpd is the socket we'll use to control mpd
