@@ -177,18 +177,10 @@ class Station:
     def settitle(self, title):
         self.title = title
 
-        
- 
-        
-
-#def handle_x10_message(s):
-#    print 'x10: ', s.readline()
-
 def handle_incoming_connection(s):
     print 'incoming'
     (news, addr) = s.sock.accept()
     news.send('go away')
-        
 
 # Let's create sockets to begin with:
 # mpd is the socket we'll use to control mpd
@@ -200,10 +192,6 @@ mpdinfo.idle()
 serv = mysock(reader=handle_incoming_connection)
 serv.bind(('0.0.0.0', MYPORT))
 serv.listen(5)
-
-#x10 = mysock(reader=handle_x10_message)
-#x10.connect(('localhost', 1099))
-
 
 # Wait for something interesting to happen
 
