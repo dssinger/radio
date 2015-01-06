@@ -30,12 +30,12 @@ class mysocket:
     def connect(self, otherend):
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.connect(otherend)
-        self.socket.setblocking(0)  # So we can wait for idles....
+        #self.socket.setblocking(0)  # So we can wait for idles....
 
     def bind(self, otherend):
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(otherend)
-        self.socket.setblocking(0)  # So we can wait for idles....
+        #self.socket.setblocking(0)  # So we can wait for idles....
 
     def listen(self, count):
         self.socket.listen(count)
