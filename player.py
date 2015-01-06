@@ -70,7 +70,7 @@ class mysocket:
 
 # Define the handlers for reads.  
 
-class Mpdinfo:
+class MPDController:
     """ Information about the current status of the MPD player.
         We don't care about the MPD database, since we're handling
         streaming audio only.
@@ -184,8 +184,8 @@ def handle_incoming_connection(s):
 # mpd is the socket we'll use to control mpd
 # serv is the socket we'll be pinged on if something exciting happens in the world; we'll create new sockets for it.
 
-mpdinfo = Mpdinfo()
-mpdinfo.idle()
+mpdcontroller = MPDController()
+mpdcontroller.idle()
 
 serv = mysocket(reader=handle_incoming_connection)
 serv.bind(('0.0.0.0', MYPORT))
@@ -198,7 +198,7 @@ writers = []
 oops = []
 finders = {}
 myreadlist = []  
-myreadlist = [mpdinfo.mysock, serv]
+myreadlist = [mpdcontroller.mysock, serv]
 finders = {}
 readlist = []
 for x in myreadlist:
@@ -222,7 +222,7 @@ while 1:
            mys.reader(mys)
         readers.remove(sock)
    
-    print mpdinfo
+    print mpdcontroller
         
 
 
