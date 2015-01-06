@@ -13,39 +13,37 @@ import socket
 import select
 MYPORT = 6601
 
-class mysock:
+class mysocket:
 
     """ Wraps a raw socket with convenience buffering functions """
 
     def __init__(self, sock=None, reader=None):
         if sock is None:
-            self.sock = socket.socket(socket.AF_INET,
+            self.socket = socket.socket(socket.AF_INET,
                     socket.SOCK_STREAM)
         else:
-            self.sock = sock
+            self.socket = sock
         self.recvbuf = ''
         self.reader = reader
 
-   
-
     def connect(self, otherend):
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.connect(otherend)
-        self.sock.setblocking(0)  # So we can wait for idles....
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.connect(otherend)
+        self.socket.setblocking(0)  # So we can wait for idles....
 
     def bind(self, otherend):
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(otherend)
-        self.sock.setblocking(0)  # So we can wait for idles....
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(otherend)
+        self.socket.setblocking(0)  # So we can wait for idles....
 
     def listen(self, count):
-        self.sock.listen(count)
+        self.socket.listen(count)
 
     def send(self, msg):
         totalsent = 0
         msglen = len(msg)
         while totalsent < msglen:
-            sent = self.sock.send(msg[totalsent:])
+            sent = self.socket.send(msg[totalsent:])
             if sent == 0:
                 raise RuntimeError('socket connection broken')
             totalsent += sent
@@ -54,7 +52,7 @@ class mysock:
         """ Receives one line at a time """
 
         while '\n' not in self.recvbuf:
-            chunk = self.sock.recv(2048)
+            chunk = self.socket.recv(2048)
             if len(chunk) == 0:
                 if self.recvbuf:
                     ret = self.recvbuf
@@ -79,11 +77,11 @@ class Mpdinfo:
     """
 
     def __init__(self):
-        self.sock = mysock(reader=self.handleidleresp)    # Must be a "mysock"
-        self.send = self.sock.send   #  Jam in convenience methods
-        self.readline = self.sock.readline   # Jam in convenience methods
+        self.mysock = mysocket(reader=self.handleidleresp)    
+        self.send = self.mysock.send   #  Jam in convenience methods
+        self.readline = self.mysock.readline   # Jam in convenience methods
         self.inidle = False
-        self.sock.connect(('localhost', 6600))
+        self.mysock.connect(('localhost', 6600))
         self.readline()    # Throw away MPD's welcome message
         self.getstatus()
         self.getplaylistinfo()
@@ -179,7 +177,7 @@ class Station:
 
 def handle_incoming_connection(s):
     print 'incoming'
-    (news, addr) = s.sock.accept()
+    (news, addr) = s.socket.accept()
     news.send('go away')
 
 # Let's create sockets to begin with:
@@ -189,7 +187,7 @@ def handle_incoming_connection(s):
 mpdinfo = Mpdinfo()
 mpdinfo.idle()
 
-serv = mysock(reader=handle_incoming_connection)
+serv = mysocket(reader=handle_incoming_connection)
 serv.bind(('0.0.0.0', MYPORT))
 serv.listen(5)
 
@@ -198,12 +196,14 @@ serv.listen(5)
 readers = []
 writers = []
 oops = []
-myreadlist = [mpdinfo.sock, serv]
+finders = {}
+myreadlist = []  
+myreadlist = [mpdinfo.mysock, serv]
 finders = {}
 readlist = []
 for x in myreadlist:
-    finders[x.sock] = x
-    readlist.append(x.sock)
+    finders[x.mysock] = x
+    readlist.append(x.mysock)
 
 writelist = []
 
@@ -211,12 +211,12 @@ writelist = []
 while 1:
     while not readers:
         print 'select'
-        (readers, writers, oops) = select.select(readlist, writelist,
-                [], 20)
+        (readers, writers, oops) = select.select(readlist, writelist, [], 20)
         if not readers:
             print 'tick'
 
     for sock in readers:
+        # "sock" is the raw socket; we need our spiffied socket.
         mys = finders[sock]
         if mys.reader:
            mys.reader(mys)
