@@ -53,7 +53,14 @@ class mysocket:
         """ Receives one line at a time """
 
         while '\n' not in self.recvbuf:
-            chunk = self.socket.recv(2048)
+            try:
+                chunk = self.socket.recv(2048)
+            except socket.error as err:
+                print err
+                ret = self.recvbuf
+                self.recvbuf = ''
+                return ret
+
             if len(chunk) == 0:
                 if self.recvbuf:
                     ret = self.recvbuf
@@ -154,14 +161,20 @@ class MPDController:
 
 
     def handleidleresp(self, sock):
+        print 'IDLE ended'
         self.inidle = False
         updates = {}
         for line in self.readresp():
-           updates[line] = True
+            print line
+            updates[self.parsepair(line)[1]] = True
+        print updates
         if 'player' in updates:
+            print 'getting status'
             self.getstatus()
         if 'playlist' in updates:
+            print 'getting playlistinfo'
             self.getplaylistinfo()
+        print 'Going IDLE'
         self.idle()
 
 
