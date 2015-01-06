@@ -162,14 +162,11 @@ class MPDController:
         self.inidle = False
         updates = {}
         for line in self.readresp():
-            print line
             updates[self.parsepair(line)[1]] = True
-        print updates
         if 'player' in updates:
-            print 'getting status'
             self.getstatus()
         if 'playlist' in updates:
-            print 'getting playlistinfo'
+            self.getstatus()
             self.getplaylistinfo()
         print 'Going IDLE'
         self.idle()
