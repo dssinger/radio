@@ -202,8 +202,8 @@ myreadlist = [mpdinfo.mysock, serv]
 finders = {}
 readlist = []
 for x in myreadlist:
-    finders[x.mysock] = x
-    readlist.append(x.mysock)
+    finders[x.socket] = x
+    readlist.append(x.socket)
 
 writelist = []
 
