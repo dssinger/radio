@@ -223,6 +223,7 @@ serv.listen(5)
 finders = {}
 readlist = []
 writelist = []
+readers = []  
 
 def addreader(mysock):
     socket = mysock.socket
