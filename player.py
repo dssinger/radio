@@ -46,7 +46,7 @@ class mysocket(object):  # Force to be newstyle
         while totalsent < msglen:
             sent = self.socket.send(msg[totalsent:])
             if sent == 0:
-                raise RuntimeError('socket connection broken')
+                raise RuntimeError('sending socket connection broken')
             totalsent += sent
 
     def readline(self):
@@ -86,8 +86,6 @@ class MPDController:
 
     def __init__(self):
         self.mysock = mysocket(reader=self.handleidleresp)    
-        self.send = self.mysock.send   #  Jam in convenience methods
-        self.readline = self.mysock.readline   # Jam in convenience methods
         self.inidle = False
         self.mysock.connect(('localhost', 6600))
         self.readline()    # Throw away MPD's welcome message
@@ -98,6 +96,13 @@ class MPDController:
         ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
         ret += '\n' + self.current
         ret += '\n' + 'idle: ' + repr(self.inidle)
+        return ret
+
+    def send(self, string):
+        self.mysock.send(string)
+
+    def readline(self):
+        ret = self.mysock.readline()
         return ret
          
     def readresp(self):
@@ -112,7 +117,6 @@ class MPDController:
 
     def noidle(self):
         was = self.inidle
-        print 'NoIdle, was', was
         if self.inidle:
             self.send('noidle\n')
             self.readresp()  # Consume the response to noidle!
@@ -120,7 +124,6 @@ class MPDController:
         return was
 
     def idle(self):
-        print 'Idle, currently', self.inidle
         self.send('idle\n')
         self.inidle = True
 
@@ -143,6 +146,7 @@ class MPDController:
         self.send((command + ' ' + ' '.join(args)).strip() + '\n')
         #self.getstatus()
         #self.getplaylistinfo()
+        self.readresp()
         if was:
             self.idle()
 
@@ -172,7 +176,6 @@ class MPDController:
 
 
     def handleidleresp(self, sock):
-        print 'IDLE ended'
         self.inidle = False
         updates = {}
         for line in self.readresp():
@@ -182,7 +185,6 @@ class MPDController:
         if 'playlist' in updates:
             self.getstatus()
             self.getplaylistinfo()
-        print 'Going IDLE'
         self.idle()
 
 
@@ -237,7 +239,6 @@ class ControlSocket(mysocket):
             return ''
 
     def handlecommand(self, ignore):
-        print "I have been called!"
         command = self.readline() + ' '
         print "Commnd: %s" % command
         if len(command) == 1:
@@ -252,21 +253,22 @@ class ControlSocket(mysocket):
                 s.send(info)
                 s.send('\n')
 
-    def play(self):
-        print 'play'
-        mpdcontroller.docommand('play')
+    # TODO:  Why are these behaving like functions instead of class methods?
 
-    def stop(self):
-        mpdcontroller.docommand('stop')
+    def play(args):
+        mpdcontroller.docommand('play', args)
 
-    def pause(self):
-        mpdcontroller.docommand('pause')
+    def stop(args):
+        mpdcontroller.docommand('stop', args)
 
-    def nextstation(self):
-        mpdcontroller.docommand('next')
+    def pause(args):
+        mpdcontroller.docommand('pause', args)
 
-    def prevstation(self):
-        mpdcontroller.docommand('previous')
+    def nextstation(args):
+        mpdcontroller.docommand('next', args)
+
+    def prevstation(args):
+        mpdcontroller.docommand('previous', args)
 
     def finis(self):
         delreader(self)
@@ -282,7 +284,6 @@ class ControlSocket(mysocket):
 
 
 def handle_incoming_connection(s):
-    print 'incoming'
     (news, addr) = s.socket.accept()
     mpdcontroller.update()
     mynews = ControlSocket(news)   # Wrap it
@@ -326,8 +327,7 @@ addreader(serv)
 
 while 1:
     while not readers:
-        print 'select', 'inidle is', mpdcontroller.inidle
-        (readers, writers, oops) = select.select(readlist, writelist, [], 5)
+        (readers, writers, oops) = select.select(readlist, writelist, [], 60)
         if not readers:
             print 'tick'
 
