@@ -14,7 +14,7 @@ import select
 import time
 MYPORT = 6601
 
-class mysocket:
+class mysocket(object):  # Force to be newstyle
 
     """ Wraps a raw socket with convenience buffering functions """
 
@@ -202,19 +202,14 @@ class Station:
 
 class ControlSocket(mysocket):
     allsocks = []
-    cmdtable = {'play': play,
-                'stop': stop,
-                'pause': pause,
-                'next': nextstation,
-                'prev': prevstation,
-                }
+    cmdtable = {}
     """ Used for connections to control this program.  It's OK if the socket goes away. """
-    def __init__(self):
-        super(self.__class__, self).__init__(reader=self.handlecommand)
+    def __init__(self, socket):
+        super(self.__class__, self).__init__(sock=socket, reader=self.handlecommand)
         self.allsocks.append(self)
 
     def remove(self):
-        if self in allsocks:
+        if self in self.allsocks:
             self.allsocks.remove(self)
 
     def send(self, str):
@@ -230,16 +225,18 @@ class ControlSocket(mysocket):
             self.finis()
             return ''
 
-    def handlecommand(self):
+    def handlecommand(self, ignore):
+        print "I have been called!"
         command = self.readline() + ' '
+        print "Commnd: %s" % command
         if len(command) == 1:
             self.finis()
             return
         (command, args) = command.split(' ', 1)
-        if command in cmdtable:
-            cmdtable[command](args)
+        if command in self.cmdtable:
+            self.cmdtable[command](args)
             info = repr(mpdcontroller)
-            for s in allsocks:
+            for s in self.allsocks:
                 s.send(info)
 
     def play(self):
@@ -261,18 +258,20 @@ class ControlSocket(mysocket):
         delreader(self)
         self.remove()
 
+    cmdtable = {'play': play,
+                'stop': stop,
+                'pause':pause,
+                'next': nextstation,
+                'prev': prevstation,
+                }
 
 
-def handle_command(s):
-    print 'in handle command'
-    cmd = s.readline()
-    print cmd
 
 def handle_incoming_connection(s):
     print 'incoming'
     (news, addr) = s.socket.accept()
     mpdcontroller.update()
-    mynews = mysocket(news, reader=handle_command)   # Wrap it
+    mynews = ControlSocket(news)   # Wrap it
     mynews.send(repr(mpdcontroller))
     mynews.send('\n')
     addreader(mynews)   # Should keep it from going away
