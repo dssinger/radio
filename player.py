@@ -144,9 +144,9 @@ class MPDController:
     def docommand(self, command, args=[]):
         was = self.noidle()
         self.send((command + ' ' + ' '.join(args)).strip() + '\n')
-        #self.getstatus()
-        #self.getplaylistinfo()
         self.readresp()
+        self.getstatus()
+        self.getplaylistinfo()
         if was:
             self.idle()
 
