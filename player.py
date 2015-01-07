@@ -200,12 +200,19 @@ class Station:
     def settitle(self, title):
         self.title = title
 
+def handle_command(s):
+    print 'in handle command'
+    cmd = s.readline()
+    print cmd
+
 def handle_incoming_connection(s):
     print 'incoming'
     (news, addr) = s.socket.accept()
     mpdcontroller.update()
-    news.send(repr(mpdcontroller))
-    news.send('\n')
+    mynews = mysocket(news, reader=handle_command)   # Wrap it
+    mynews.send(repr(mpdcontroller))
+    mynews.send('\n')
+    addreader(mynews)   # Should keep it from going away
 
 # Let's create sockets to begin with:
 # mpd is the socket we'll use to control mpd
