@@ -200,6 +200,69 @@ class Station:
     def settitle(self, title):
         self.title = title
 
+class ControlSocket(mysocket):
+    allsocks = []
+    cmdtable = {'play': play,
+                'stop': stop,
+                'pause': pause,
+                'next': nextstation,
+                'prev': prevstation,
+                }
+    """ Used for connections to control this program.  It's OK if the socket goes away. """
+    def __init__(self):
+        super(self.__class__, self).__init__(reader=self.handlecommand)
+        self.allsocks.append(self)
+
+    def remove(self):
+        if self in allsocks:
+            self.allsocks.remove(self)
+
+    def send(self, str):
+        try:
+            super(self.__class__, self).send(str)
+        except RuntimeError:
+            self.finis()
+
+    def readline(self):
+        try:
+            return super(self.__class__, self).readline()
+        except RuntimeError:
+            self.finis()
+            return ''
+
+    def handlecommand(self):
+        command = self.readline() + ' '
+        if len(command) == 1:
+            self.finis()
+            return
+        (command, args) = command.split(' ', 1)
+        if command in cmdtable:
+            cmdtable[command](args)
+            info = repr(mpdcontroller)
+            for s in allsocks:
+                s.send(info)
+
+    def play(self):
+        mpdcontroller.send('play')
+
+    def stop(self):
+        mpdcontroller.send('stop')
+
+    def pause(self):
+        mpdcontroller.send('pause')
+
+    def nextstation(self):
+        mpdcontroller.send('next')
+
+    def prevstation(self):
+        mpdcontroller.send('previous')
+
+    def finis(self):
+        delreader(self)
+        self.remove()
+
+
+
 def handle_command(s):
     print 'in handle command'
     cmd = s.readline()
