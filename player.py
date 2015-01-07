@@ -215,7 +215,6 @@ class Station:
 
 class ControlSocket(mysocket):
     allsocks = []
-    cmdtable = {}
     """ Used for connections to control this program.  It's OK if the socket goes away. """
     def __init__(self, socket):
         super(self.__class__, self).__init__(sock=socket, reader=self.handlecommand)
@@ -254,6 +253,7 @@ class ControlSocket(mysocket):
                 s.send('\n')
 
     # TODO:  Why are these behaving like functions instead of class methods?
+    # TODO:  Must be the same reason that I have to put them in the table as "play" rather than self.play, etc.
 
     def play(args):
         mpdcontroller.docommand('play', args)
