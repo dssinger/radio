@@ -220,19 +220,24 @@ serv.listen(5)
 
 # Wait for something interesting to happen
 
-readers = []
-writers = []
-oops = []
-finders = {}
-myreadlist = []  
-myreadlist = [mpdcontroller.mysock, serv]
 finders = {}
 readlist = []
-for x in myreadlist:
-    finders[x.socket] = x
-    readlist.append(x.socket)
-
 writelist = []
+
+def addreader(mysock):
+    socket = mysock.socket
+    if socket not in readlist:
+        readlist.append(socket)
+        finders[socket] = mysock
+        
+def delreader(mysock):
+    socket = mysock.socket
+    if socket in readlist:
+        readlist.remove(socket)
+        del finders[socket]
+
+addreader(mpdcontroller.mysock)
+addreader(serv)
 
 
 while 1:
