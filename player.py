@@ -97,6 +97,7 @@ class MPDController:
     def __repr__(self):
         ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
         ret += '\n' + self.current
+        ret += '\n' + 'idle: ' + repr(self.inidle)
         return ret
          
     def readresp(self):
@@ -111,6 +112,7 @@ class MPDController:
 
     def noidle(self):
         was = self.inidle
+        print 'NoIdle, was', was
         if self.inidle:
             self.send('noidle\n')
             self.readresp()  # Consume the response to noidle!
@@ -118,6 +120,7 @@ class MPDController:
         return was
 
     def idle(self):
+        print 'Idle, currently', self.inidle
         self.send('idle\n')
         self.inidle = True
 
@@ -132,6 +135,14 @@ class MPDController:
         for l in self.readresp():
             (item, value) = self.parsepair(l)
             self.status[item] = value
+        if was:
+            self.idle()
+
+    def docommand(self, command, args=[]):
+        was = self.noidle()
+        self.send((command + ' ' + ' '.join(args)).strip() + '\n')
+        #self.getstatus()
+        #self.getplaylistinfo()
         if was:
             self.idle()
 
@@ -234,25 +245,28 @@ class ControlSocket(mysocket):
             return
         (command, args) = command.split(' ', 1)
         if command in self.cmdtable:
+            print 'command found'
             self.cmdtable[command](args)
             info = repr(mpdcontroller)
             for s in self.allsocks:
                 s.send(info)
+                s.send('\n')
 
     def play(self):
-        mpdcontroller.send('play')
+        print 'play'
+        mpdcontroller.docommand('play')
 
     def stop(self):
-        mpdcontroller.send('stop')
+        mpdcontroller.docommand('stop')
 
     def pause(self):
-        mpdcontroller.send('pause')
+        mpdcontroller.docommand('pause')
 
     def nextstation(self):
-        mpdcontroller.send('next')
+        mpdcontroller.docommand('next')
 
     def prevstation(self):
-        mpdcontroller.send('previous')
+        mpdcontroller.docommand('previous')
 
     def finis(self):
         delreader(self)
@@ -312,8 +326,8 @@ addreader(serv)
 
 while 1:
     while not readers:
-        print 'select'
-        (readers, writers, oops) = select.select(readlist, writelist, [], 20)
+        print 'select', 'inidle is', mpdcontroller.inidle
+        (readers, writers, oops) = select.select(readlist, writelist, [], 5)
         if not readers:
             print 'tick'
 
