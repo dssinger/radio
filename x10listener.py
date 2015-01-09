@@ -44,12 +44,14 @@ def handlex10line(l):
 
 
 
-s = mysocket()
-s.connect(('localhost', 1099))    # Connect to the X10 via mochad
-l = s.readline()
-while len(l) > 0:
-    print l
-    handlex10line(l)
+def do_main_program():
+    s = mysocket()
+    s.connect(('localhost', 1099))    # Connect to the X10 via mochad
     l = s.readline()
+    while len(l) > 0:
+        print l
+        handlex10line(l)
+        l = s.readline()
 
-
+if __name__ == "__main__":
+    do_main_program()
