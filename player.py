@@ -29,8 +29,8 @@ class MPDController:
         self.inidle = False
         self.mysock.connect(('localhost', 6600))
         self.readline()    # Throw away MPD's welcome message
-        self.getstatus()
-        self.getplaylistinfo()
+        self.docommand('repeat 1')   # Ensure we can loop around
+        # docommand also gets current status and playlist for free.
 
     def __repr__(self):
         ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
@@ -106,7 +106,10 @@ class MPDController:
             elif item == 'Title':
                 playlist[-1].title = value
         self.playlist = playlist
-        self.current = repr(self.playlist[int(self.status['song'])])
+        try:
+            self.current = repr(self.playlist[int(self.status['song'])])
+        except KeyError:
+            self.current = ''  # For example, if we're stopped.
         if was:
             self.idle()
 
