@@ -1,16 +1,18 @@
 #!/usr/bin/python
 
+import sys
 from mysocket import *
 
 def sendcmd(cmd):
     sock = mysocket()
     sock.connect(('localhost', 6600))
     sock.send(cmd + '\n')
-    print "sent %s" % cmd
+    print "sent %s" % cmd; sys.stdout.flush()
     resp = self.readline()
     while resp != '' and resp != 'OK' and not resp.startswith('ACK '):
-        print resp
+        print resp; sys.stdout.flush(); 
         resp = self.readline()
+    print 'ready to close socket'; sys.stdout.flush()
     sock.close()
 
 
@@ -49,7 +51,7 @@ def do_main_program():
     s.connect(('localhost', 1099))    # Connect to the X10 via mochad
     l = s.readline()
     while len(l) > 0:
-        print l
+        print l; sys.stdout.flush()
         handlex10line(l)
         l = s.readline()
 
