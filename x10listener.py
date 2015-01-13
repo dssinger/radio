@@ -8,10 +8,11 @@ def sendcmd(cmd):
     sock.connect(('localhost', 6600))
     sock.send(cmd + '\n')
     print "sent %s" % cmd; sys.stdout.flush()
-    resp = self.readline()
+    resp = sock.readline()
+    print "back from readline, resp = '%s'" % resp; sys.stdout.flush()
     while resp != '' and resp != 'OK' and not resp.startswith('ACK '):
         print resp; sys.stdout.flush(); 
-        resp = self.readline()
+        resp = sock.readline()
     print 'ready to close socket'; sys.stdout.flush()
     sock.close()
 
