@@ -295,7 +295,8 @@ while 1:
            mys.reader(mys)
         readers.remove(sock)
    
-    status = time.asctime() + '\n' + repr(mpdcontroller) + '\n'
+    status = repr(mpdcontroller) + '\n'
+    print time.asctime()
     print status
     with open('status.txt', 'w') as outfile:
 	outfile.write(status)
