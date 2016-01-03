@@ -12,6 +12,7 @@
 import socket
 import select
 import time
+import sys
 from mysocket import *
 
 MYPORT = 6601
@@ -128,6 +129,7 @@ class MPDController:
         if 'playlist' in updates:
             self.getstatus()
             self.getplaylistinfo()
+        ControlSocket.broadcast()
         self.idle()
 
 
@@ -159,6 +161,13 @@ class Station:
 class ControlSocket(mysocket):
     allsocks = []
     """ Used for connections to control this program.  It's OK if the socket goes away. """
+
+    @classmethod
+    def broadcast(self):
+        info = repr(mpdcontroller)
+        for s in self.allsocks:
+            s.send(info+'\n')
+
     def __init__(self, socket):
         super(self.__class__, self).__init__(sock=socket, reader=self.handlecommand)
         self.allsocks.append(self)
@@ -182,7 +191,7 @@ class ControlSocket(mysocket):
 
     def handlecommand(self, ignore):
         command = self.readline() + ' '
-        print "Commnd: %s" % command
+        print "Command: '%s'" % command
         if len(command) == 1:
             self.finis()
             return
@@ -190,10 +199,8 @@ class ControlSocket(mysocket):
         if command in self.cmdtable:
             print 'command found'
             self.cmdtable[command](args)
-            info = repr(mpdcontroller)
-            for s in self.allsocks:
-                s.send(info)
-                s.send('\n')
+        info = repr(mpdcontroller)
+        self.broadcast()
 
     # TODO:  Why are these behaving like functions instead of class methods?
     # TODO:  Must be the same reason that I have to put them in the table as "play" rather than self.play, etc.
@@ -215,6 +222,7 @@ class ControlSocket(mysocket):
 
     def finis(self):
         delreader(self)
+        self.socket.close()
         self.remove()
 
     cmdtable = {'play': play,
@@ -273,6 +281,7 @@ while 1:
         (readers, writers, oops) = select.select(readlist, writelist, [], 60)
         if not readers:
             print 'tick'
+            continue
 
     for sock in readers:
         # "sock" is the raw socket; we need our spiffied socket.
@@ -281,8 +290,11 @@ while 1:
            mys.reader(mys)
         readers.remove(sock)
    
-    print time.asctime()
-    print mpdcontroller
+    status = time.asctime() + '\n' + repr(mpdcontroller) + '\n'
+    print status
+    with open('status.txt', 'w') as outfile:
+	outfile.write(status)
+    sys.stdout.flush()
         
 
 
