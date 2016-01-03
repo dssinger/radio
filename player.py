@@ -34,9 +34,10 @@ class MPDController:
         # docommand also gets current status and playlist for free.
 
     def __repr__(self):
-        ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
-        ret += '\n' + self.current
-        ret += '\n' + 'idle: ' + repr(self.inidle)
+        ret = '{' 
+        ret += ',\n'.join(['"%s":%s' % (k, self.status[k]) for k in self.status.keys()])
+        ret += ',\n"current":' + self.current
+        ret += ',\n' + '"idle":"%s"} ' % repr(self.inidle)
         return ret
 
     def send(self, string):
@@ -78,6 +79,10 @@ class MPDController:
         self.status = {}
         for l in self.readresp():
             (item, value) = self.parsepair(l)
+            try:
+                float(value)
+            except ValueError:
+                value = '"' + value + '"'
             self.status[item] = value
         if was:
             self.idle()
@@ -143,7 +148,7 @@ class Station:
         self.stations[url] = self
 
     def __repr__(self):
-        return '{url:"%s",\nname:"%s",\ntitle:"%s"}' % (self.url, self.name, self.title) 
+        return '{"url":"%s",\n"name":"%s",\n"title":"%s"}' % (self.url, self.name, self.title) 
   
     @classmethod
     def find(self, url):
