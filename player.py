@@ -135,22 +135,22 @@ class MPDController:
 
 class Station:
     stations = {}
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, url):
+        self.url = url
         self.name = ''
         self.pos = None
         self.title = ''
-        self.stations[file] = self
+        self.stations[url] = self
 
     def __repr__(self):
-        return self.file + '\n  ' + self.name + '\n  ' + self.title
+        return '{url:"%s",\nname:"%s",\ntitle:"%s"}' % (self.url, self.name, self.title) 
   
     @classmethod
-    def find(self, file):
-        if file in self.stations:
-            return self.stations[file]
+    def find(self, url):
+        if url in self.stations:
+            return self.stations[url]
         else:
-            return self.__init__(file)
+            return self.__init__(url)
 
     def setname(self, name):
         self.name = name
