@@ -5,7 +5,7 @@ from mysocket import *
 
 def sendcmd(cmd):
     sock = mysocket()
-    sock.connect(('localhost', 6600))
+    sock.connect(('radio.local', 6600))
     sock.send(cmd + '\n')
     print "sent %s" % cmd; sys.stdout.flush()
     resp = sock.readline()
@@ -17,7 +17,7 @@ def sendcmd(cmd):
     sock.close()
 
 
-def handlex10line(l):
+def handlex10line(l,s):
     """ X10 lines have this form:
     01/08 15:47:00 Rx RF HouseUnit: D5 Func: Off
 
@@ -42,6 +42,8 @@ def handlex10line(l):
                     sendcmd('previous')
                 else:
                     sendcmd('next')
+            elif hu == 'D5':
+                s.send('RF D5 ' + func + '\n')
         except:
             pass   # We don't care!
 
@@ -53,7 +55,7 @@ def do_main_program():
     l = s.readline()
     while len(l) > 0:
         print l; sys.stdout.flush()
-        handlex10line(l)
+        handlex10line(l,s)
         l = s.readline()
 
 if __name__ == "__main__":
