@@ -12,6 +12,7 @@
 import socket
 import select
 import time
+import sys
 from mysocket import *
 
 MYPORT = 6601
@@ -33,9 +34,10 @@ class MPDController:
         # docommand also gets current status and playlist for free.
 
     def __repr__(self):
-        ret = '\n'.join(['%s=%s' % (k, self.status[k]) for k in self.status.keys()])
-        ret += '\n' + self.current
-        ret += '\n' + 'idle: ' + repr(self.inidle)
+        ret = '{' 
+        ret += ',\n'.join(['"%s":%s' % (k, self.status[k]) for k in self.status.keys()])
+        ret += ',\n"current":' + self.current
+        ret += ',\n' + '"idle":"%s"} ' % repr(self.inidle)
         return ret
 
     def send(self, string):
@@ -77,6 +79,10 @@ class MPDController:
         self.status = {}
         for l in self.readresp():
             (item, value) = self.parsepair(l)
+            try:
+                float(value)
+            except ValueError:
+                value = '"' + value + '"'
             self.status[item] = value
         if was:
             self.idle()
@@ -128,27 +134,28 @@ class MPDController:
         if 'playlist' in updates:
             self.getstatus()
             self.getplaylistinfo()
+        ControlSocket.broadcast()
         self.idle()
 
 
 class Station:
     stations = {}
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, url):
+        self.url = url
         self.name = ''
         self.pos = None
         self.title = ''
-        self.stations[file] = self
+        self.stations[url] = self
 
     def __repr__(self):
-        return self.file + '\n  ' + self.name + '\n  ' + self.title
+        return '{"url":"%s",\n"name":"%s",\n"title":"%s"}' % (self.url, self.name, self.title) 
   
     @classmethod
-    def find(self, file):
-        if file in self.stations:
-            return self.stations[file]
+    def find(self, url):
+        if url in self.stations:
+            return self.stations[url]
         else:
-            return self.__init__(file)
+            return self.__init__(url)
 
     def setname(self, name):
         self.name = name
@@ -159,6 +166,13 @@ class Station:
 class ControlSocket(mysocket):
     allsocks = []
     """ Used for connections to control this program.  It's OK if the socket goes away. """
+
+    @classmethod
+    def broadcast(self):
+        info = repr(mpdcontroller)
+        for s in self.allsocks:
+            s.send(info+'\n')
+
     def __init__(self, socket):
         super(self.__class__, self).__init__(sock=socket, reader=self.handlecommand)
         self.allsocks.append(self)
@@ -182,7 +196,7 @@ class ControlSocket(mysocket):
 
     def handlecommand(self, ignore):
         command = self.readline() + ' '
-        print "Commnd: %s" % command
+        print "Command: '%s'" % command
         if len(command) == 1:
             self.finis()
             return
@@ -190,10 +204,8 @@ class ControlSocket(mysocket):
         if command in self.cmdtable:
             print 'command found'
             self.cmdtable[command](args)
-            info = repr(mpdcontroller)
-            for s in self.allsocks:
-                s.send(info)
-                s.send('\n')
+        info = repr(mpdcontroller)
+        self.broadcast()
 
     # TODO:  Why are these behaving like functions instead of class methods?
     # TODO:  Must be the same reason that I have to put them in the table as "play" rather than self.play, etc.
@@ -215,6 +227,7 @@ class ControlSocket(mysocket):
 
     def finis(self):
         delreader(self)
+        self.socket.close()
         self.remove()
 
     cmdtable = {'play': play,
@@ -273,6 +286,7 @@ while 1:
         (readers, writers, oops) = select.select(readlist, writelist, [], 60)
         if not readers:
             print 'tick'
+            continue
 
     for sock in readers:
         # "sock" is the raw socket; we need our spiffied socket.
@@ -281,8 +295,12 @@ while 1:
            mys.reader(mys)
         readers.remove(sock)
    
+    status = repr(mpdcontroller) + '\n'
     print time.asctime()
-    print mpdcontroller
+    print status
+    with open('status.txt', 'w') as outfile:
+	outfile.write(status)
+    sys.stdout.flush()
         
 
 
