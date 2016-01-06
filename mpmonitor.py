@@ -135,6 +135,7 @@ class Controller(asyncore.dispatcher):
                         self.pp.pause()
                 self.send(repr(Station.current()) + '\n')            
                 print repr(self.player) 
+        self.close()
     
 
 
