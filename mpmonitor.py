@@ -54,6 +54,14 @@ class Player:
         # Manually spawn the Mplayer process
         self.player.spawn()
 
+    def __repr__(self):
+        ret = []
+        ret.append('"title":"%s"' % self.title)
+        ret.append('"icyinfo":"%s"' % repr(self.icy))
+        ret.append('"paused":"%s"' % self.player.paused)
+        ret.append('"metadata":"%s"' % self.player.metadata)
+        return '{' + ',\n'.join(ret) + '}'
+
     def handle_data(self, data):
         if not data.startswith('EOF code'):
             print('log: %s' % (data, ))
@@ -77,8 +85,11 @@ class Player:
                                 self.icy[name] = value
                                 parts = rest.split('&')
                                 for p in parts:
-                                    (name, value) = p.split('=',1)
-                                    self.icy[name] = urllib.unquote(value).decode('utf8')
+                                    if '=' in p:
+                                        (name, value) = p.split('=',1)
+                                        self.icy[name] = urllib.unquote(value).decode('utf8')
+                                    else:
+                                        print "no = in: ", p
                 except Exception, err:
                     print "songtitle error: " + str(err)
                     self.title = content.split("'")[1]
@@ -91,7 +102,8 @@ class Controller(asyncore.dispatcher):
     def __init__(self, conn_sock, client_address, player):
         self.client_address = client_address
         self.sock = conn_sock
-        self.player = player.player
+        self.player = player
+        self.pp = player.player
         self.buffer = ''
         print("accepted from", client_address)
         # Hook ourselves into the dispatch loop
@@ -104,21 +116,25 @@ class Controller(asyncore.dispatcher):
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
                 print 'Command: "%s"' % line
+                print 'paused = ', self.pp.paused
                 if line[0] == 'q':
                     sys.exit()
-                elif line.startswith('stop') and not self.player.paused:
-                    self.player.pause()
-                elif line.startswith('play') and self.player.paused:
-                    self.player.pause()
+                elif line.startswith('stop') and not self.pp.paused:
+                    self.pp.pause()
+                    print 'paused => ', self.pp.paused
+                elif line.startswith('play') and self.pp.paused:
+                    self.pp.pause()
+                    print 'paused => ', self.pp.paused
                 elif line.startswith('next'):
-                    self.player.loadfile(Station.next().url)
-                    if self.player.paused:
-                        self.player.pause()
+                    self.pp.loadfile(Station.next().url)
+                    if self.pp.paused:
+                        self.pp.pause()
                 elif line.startswith('prev'):
-                    self.player.loadfile(Station.prev().url)
-                    if self.player.paused:
-                        self.player.pause()
+                    self.pp.loadfile(Station.prev().url)
+                    if self.pp.paused:
+                        self.pp.pause()
                 self.send(repr(Station.current()) + '\n')            
+                print repr(self.player) 
     
 
 
@@ -138,17 +154,17 @@ class ControlServer(asyncore.dispatcher):
         channel, addr = self.accept()
         self.handlerClass(channel, addr, self.player)
 
-if __name__ == '__main__':
+def do_main_program():
     player = Player()
     server = ControlServer(player)
     # Define the stations
     Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
+    Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
+    Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
     Station('WQXR', 'http://stream.wqxr.org/wqxr')
     Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
     Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
     Station('WGBH', 'http://audio.wgbh.org:8004')
-    Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
-    Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
 
     # play a stream
     if len(sys.argv) > 1:
@@ -157,3 +173,8 @@ if __name__ == '__main__':
         player.player.loadfile(Station.current().url)
     # run the asyncore event loop
     asyncore.loop()
+
+if __name__ == "__main__":
+    do_main_program()
+    
+
