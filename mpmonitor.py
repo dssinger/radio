@@ -56,6 +56,14 @@ class Player:
         # Manually spawn the Mplayer process
         self.player.spawn()
 
+        # Monkey patch a handle_error event into the player
+        self.player.stdout._dispatcher.handle_error = self.handle_error
+
+    def handle_error(self):
+        (t, v, db) = sys.exc_info()
+        print v
+        return
+
     def __repr__(self):
         ret = []
         ret.append('"title":"%s"' % self.title)
@@ -64,40 +72,37 @@ class Player:
         ret.append('"paused":"%s"' % self.player.paused)
         return '{' + ',\n'.join(ret) + '}'
 
-    def handle_data(self, data):
-        if not data.startswith('EOF code'):
-            print('%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), data ))
-            if data.startswith('ICY Info:'):
-                    
-                start = "StreamTitle='"
-                end = "';"
 
-                try: 
-                    content = data.replace('ICY Info:','').split("';")
-                    self.icy = {}
-                    for c in content:
-                        if '=' in c:
-                            (name,value) = c.split('=',1)
-                            value = value[1:].rstrip()
+    def handle_data(self, line):
+        # Called one line at a time by mplayer.py
+        print '%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), line )
+        if line.startswith('ICY Info:'):
+            try: 
+                content = line.replace('ICY Info:','').split("';")
+                self.icy = {}
+                for c in content:
+                    if '=' in c:
+                        (name,value) = c.split('=',1)
+                        value = value[1:].rstrip()
+                        self.icy[name] = value
+                        if name.lower() == 'streamtitle':
+                            self.title = value
+                        if name.lower() == 'streamurl' and '&' in value:
+                            (value, rest) = value.split('&', 1)
                             self.icy[name] = value
-                            if name.lower() == 'streamtitle':
-                                self.title = value
-                            if name.lower() == 'streamurl' and '&' in value:
-                                (value, rest) = value.split('&', 1)
-                                self.icy[name] = value
-                                parts = rest.split('&')
-                                for p in parts:
-                                    if '=' in p:
-                                        (name, value) = p.split('=',1)
-                                        self.icy[name] = urllib.unquote(value).decode('utf8')
-                                    else:
-                                        print "no = in: ", p
-                except Exception, err:
-                    print "songtitle error: " + str(err)
-                    self.title = content.split("'")[1]
-                print self.icy
-        else:
-            self.player.quit()
+                            parts = rest.split('&')
+                            for p in parts:
+                                if '=' in p:
+                                    (name, value) = p.split('=',1)
+                                    self.icy[name] = urllib.unquote(value).decode('utf8')
+                                else:
+                                    print "no = in: ", p
+            except Exception, err:
+                print "songtitle error: " + str(err)
+                self.title = content.split("'")[1]
+            print self.icy
+        elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
+            self.player.loadfile(Station.current().url)
 
 
 class Controller(asyncore.dispatcher):
@@ -167,20 +172,22 @@ class ControlServer(asyncore.dispatcher):
 def do_main_program():
     player = Player()
     server = ControlServer(player)
-    # Define the stations
-    Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
-    Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
-    Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
-    Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
-    Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
-    Station('WQXR', 'http://stream.wqxr.org/wqxr')   
-    Station('WGBH', 'http://audio.wgbh.org:8004')
-
-    # play a stream
     if len(sys.argv) > 1:
-        player.player.loadfile(sys.argv[1])
+        for i in xrange(1,len(sys.argv)):
+            Station('%d' % i, sys.argv[i])
     else:
-        player.player.loadfile(Station.current().url)
+        # Define the stations
+        Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
+        Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
+        Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
+        Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
+        Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
+        Station('WQXR', 'http://stream.wqxr.org/wqxr')
+        Station('WGBH', 'http://audio.wgbh.org:8004')
+
+    # play the first station
+    print Station.current()
+    player.player.loadfile(Station.current().url)
     # run the asyncore event loop
     asyncore.loop(5)
 
