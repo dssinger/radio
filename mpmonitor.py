@@ -42,6 +42,7 @@ class Player:
     def __init__(self):
         # Set up variables we make visible
         self.title = ''
+        self.icy = {}
         # Don't autospawn because we want to setup the args later
         self.player = AsyncPlayer(autospawn=False)
 
@@ -58,7 +59,6 @@ class Player:
         ret = []
         ret.append('"title":"%s"' % self.title)
         ret.append('"icyinfo":"%s"' % repr(self.icy))
-        ret.append('"paused":"%s"' % self.player.paused)
         ret.append('"metadata":"%s"' % self.player.metadata)
         return '{' + ',\n'.join(ret) + '}'
 
@@ -105,10 +105,21 @@ class Controller(asyncore.dispatcher):
         self.player = player
         self.pp = player.player
         self.buffer = ''
+        self.outbuf = ''
         print("accepted from", client_address)
         # Hook ourselves into the dispatch loop
         asyncore.dispatcher.__init__(self, self.sock)
 
+    def readable(self):
+        return True     # Always willing to read
+
+    def writeable(self):
+        return len(self.outbuf) > 0
+
+    def handle_write(self):
+        sent = self.send(self.outbuf)
+        self.outbuf = self.outbuf[sent:]
+    
     def handle_read(self):
         data = self.recv(1024)
         if data:
@@ -116,26 +127,19 @@ class Controller(asyncore.dispatcher):
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
                 print 'Command: "%s"' % line
-                print 'paused = ', self.pp.paused
-                if line[0] == 'q':
+                if line.startswith('quit'):
                     sys.exit()
-                elif line.startswith('stop') and not self.pp.paused:
+                elif line.startswith('pause'):
                     self.pp.pause()
-                    print 'paused => ', self.pp.paused
-                elif line.startswith('play') and self.pp.paused:
-                    self.pp.pause()
-                    print 'paused => ', self.pp.paused
+                elif line.startswith('stop'):
+                    self.pp.stop()
+                elif line.startswith('play'):
+                    self.pp.loadfile(Station.current().url)
                 elif line.startswith('next'):
                     self.pp.loadfile(Station.next().url)
-                    if self.pp.paused:
-                        self.pp.pause()
                 elif line.startswith('prev'):
                     self.pp.loadfile(Station.prev().url)
-                    if self.pp.paused:
-                        self.pp.pause()
-                self.send(repr(Station.current()) + '\n')            
-                print repr(self.player) 
-        self.close()
+                self.outbuf += repr(Station.current()) + '\n' + repr(self.player) + '\n'
     
 
 
@@ -151,9 +155,12 @@ class ControlServer(asyncore.dispatcher):
         self.player = player
         print "listening on port", self.port
 
+
     def handle_accept(self):
         channel, addr = self.accept()
         self.handlerClass(channel, addr, self.player)
+        player = self.player
+        
 
 def do_main_program():
     player = Player()
@@ -162,9 +169,9 @@ def do_main_program():
     Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
     Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
     Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
-    Station('WQXR', 'http://stream.wqxr.org/wqxr')
     Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
     Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
+    Station('WQXR', 'http://stream.wqxr.org/wqxr')   
     Station('WGBH', 'http://audio.wgbh.org:8004')
 
     # play a stream
@@ -173,7 +180,7 @@ def do_main_program():
     else:
         player.player.loadfile(Station.current().url)
     # run the asyncore event loop
-    asyncore.loop()
+    asyncore.loop(5)
 
 if __name__ == "__main__":
     do_main_program()
