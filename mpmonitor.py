@@ -4,6 +4,7 @@ import re
 import sys
 import urllib
 import socket
+import time
 from mplayer.async import AsyncPlayer
 
 class Station:
@@ -60,11 +61,12 @@ class Player:
         ret.append('"title":"%s"' % self.title)
         ret.append('"icyinfo":"%s"' % repr(self.icy))
         ret.append('"metadata":"%s"' % self.player.metadata)
+        ret.append('"paused":"%s"' % self.player.paused)
         return '{' + ',\n'.join(ret) + '}'
 
     def handle_data(self, data):
         if not data.startswith('EOF code'):
-            print('log: %s' % (data, ))
+            print('%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), data ))
             if data.startswith('ICY Info:'):
                     
                 start = "StreamTitle='"
