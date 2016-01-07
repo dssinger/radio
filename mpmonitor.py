@@ -61,7 +61,8 @@ class Player:
 
     def handle_error(self):
         (t, v, db) = sys.exc_info()
-        print v
+        sys.stderr.write(v)
+        sys.stderr.write('\n')
         return
 
     def __repr__(self):
@@ -169,12 +170,12 @@ class ControlServer(asyncore.dispatcher):
         player = self.player
         
 
-def do_main_program():
+def do_main_program(stations):
     player = Player()
     server = ControlServer(player)
-    if len(sys.argv) > 1:
-        for i in xrange(1,len(sys.argv)):
-            Station('%d' % i, sys.argv[i])
+    if len(stations) > 0:
+        for i in xrange(len(stations)):
+            Station('%d' % i, stations[i])
     else:
         # Define the stations
         Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
@@ -189,9 +190,26 @@ def do_main_program():
     print Station.current()
     player.player.loadfile(Station.current().url)
     # run the asyncore event loop
-    asyncore.loop(5)
+    asyncore.loop()
 
 if __name__ == "__main__":
-    do_main_program()
-    
+    import daemon
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nodaemon', dest='daemon', action='store_false')
+    parser.add_argument('--daemon', dest='daemon', action='store_true')
+    parser.add_argument('sources', metavar='stations', type=str, nargs='*',
+            help='Sources to play (in order).  Default is internal list.')
+    parms = parser.parse_args()
+
+    if parms.daemon:
+        sys.stderr.close()
+        sys.stderr = open('/home/david/src/radio/errlog.txt', 'a')
+        sys.stdout.close()
+        sys.stdout = open('/home/david/src/radio/log.txt', 'a')
+        with daemon.DaemonContext(working_directory="/home/david/src/radio",initgroups=False):
+            do_main_program(parms.sources)
+    else:
+        do_main_program(parms.sources)
 
