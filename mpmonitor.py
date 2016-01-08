@@ -6,6 +6,7 @@ import urllib
 import socket
 import time
 from mplayer.async import AsyncPlayer
+import json
 
 subscribers = []       # Connections which care
 
@@ -59,8 +60,15 @@ class Station:
         self.stationdir[label] = self
 
     def __repr__(self):
-        return '{"position":%d,"label":"%s","url":"%s"}' % (self.pos, self.label, self.url)
+        return '{"pos":%d,"label":"%s","url":"%s"}' % (self.pos, self.label, self.url)
         
+    def json(self):
+        ans = {}
+        ans['pos'] = self.pos
+        ans['label'] = self.label
+        ans['url'] = self.url
+        return ans
+
 
 class Player:
     def __init__(self):
@@ -84,7 +92,11 @@ class Player:
 
     def handle_error(self):
         (t, v, db) = sys.exc_info()
-        sys.stderr.write(v)
+        sys.stderr.write(repr(v))
+        sys.stderr.write('\n')
+        sys.stderr.write(repr(t))
+        sys.stderr.write('\n')
+        sys.stderr.write(repr(db))
         sys.stderr.write('\n')
         return
 
@@ -107,6 +119,7 @@ class Player:
                 for c in content:
                     if '=' in c:
                         (name,value) = c.split('=',1)
+                        name = name.strip()
                         value = value[1:].rstrip()
                         self.icy[name] = value
                         if name.lower() == 'streamtitle':
@@ -125,8 +138,15 @@ class Player:
                 print "songtitle error: " + str(err)
                 self.title = content.split("'")[1]
             print self.icy
+            info = {}
+            info['icy'] = self.icy
+            info['station'] = Station.current().json()
+            ans = json.dumps(info)
+            print ans
+            with open('status.json', 'w') as outfile:
+                outfile.write(ans)
             for each in subscribers:
-                each.outbuf += '"icy":%s' % repr(self.icy)
+                each.outbuf += ans + '\n'
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
             self.player.loadfile(Station.current().url)
 
@@ -177,8 +197,8 @@ class Controller(asyncore.dispatcher):
                     self.pp.loadfile(Station.prev().url)
                 elif line.startswith('stat'):
                     resp.append('"stationlist":%s' % Station.stations())
-                resp.append('"playing":%s' % repr(Station.current()))
-                self.outbuf += '{%s}' % ',\n'.join(resp)
+                #resp.append('"playing":%s' % repr(Station.current()))
+                self.outbuf += '{%s}' % ',\n'.join(resp) + '\n'
         else:
             self.close()
     
