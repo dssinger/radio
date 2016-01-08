@@ -7,8 +7,11 @@ import socket
 import time
 from mplayer.async import AsyncPlayer
 
+subscribers = []       # Connections which care
+
 class Station:
     stationlist = []
+    stationdir = {}
     stationpos = 0
 
     @classmethod
@@ -29,14 +32,34 @@ class Station:
     def current(self):
         return self.stationlist[self.stationpos]
 
+    @classmethod
+    def select(self, what):
+        try:
+            pos = int(what)
+            if (pos > 0) and (pos < len(self.stationlist)):
+                self.stationpos = pos
+        except ValueError:
+            if what in self.stationdir:
+                self.stationpos = self.stationdir[what].pos
+        return self.stationlist[self.stationpos]
+
+    @classmethod
+    def stations(self):
+        ret = []
+        for s in self.stationlist:
+            ret.append(repr(s))
+        return '[%s]' % ','.join(ret)
+        
+
     def __init__(self, label, url):
         self.label = label
         self.url = url
         self.pos = len(self.stationlist)
         self.stationlist.append(self)
+        self.stationdir[label] = self
 
     def __repr__(self):
-        return '%d: %s\n   %s' % (self.pos, self.label, self.url)
+        return '{"position":%d,"label":"%s","url":"%s"}' % (self.pos, self.label, self.url)
         
 
 class Player:
@@ -102,6 +125,8 @@ class Player:
                 print "songtitle error: " + str(err)
                 self.title = content.split("'")[1]
             print self.icy
+            for each in subscribers:
+                each.outbuf += '"icy":%s' % repr(self.icy)
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
             self.player.loadfile(Station.current().url)
 
@@ -116,6 +141,7 @@ class Controller(asyncore.dispatcher):
         self.outbuf = ''
         print("accepted from", client_address)
         # Hook ourselves into the dispatch loop
+        subscribers.append(self)
         asyncore.dispatcher.__init__(self, self.sock)
 
     def readable(self):
@@ -132,6 +158,7 @@ class Controller(asyncore.dispatcher):
         data = self.recv(1024)
         if data:
             self.buffer += data
+            resp = []
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
                 print 'Command: "%s"' % line
@@ -142,13 +169,23 @@ class Controller(asyncore.dispatcher):
                 elif line.startswith('stop'):
                     self.pp.stop()
                 elif line.startswith('play'):
-                    self.pp.loadfile(Station.current().url)
+                    rest = line[5:]
+                    self.pp.loadfile(Station.select(rest).url)
                 elif line.startswith('next'):
                     self.pp.loadfile(Station.next().url)
                 elif line.startswith('prev'):
                     self.pp.loadfile(Station.prev().url)
-                self.outbuf += repr(Station.current()) + '\n' + repr(self.player) + '\n'
+                elif line.startswith('stat'):
+                    resp.append('"stationlist":%s' % Station.stations())
+                resp.append('"playing":%s' % repr(Station.current()))
+                self.outbuf += '{%s}' % ',\n'.join(resp)
+        else:
+            self.close()
     
+    def handle_close(self):
+        if self in subscribers:
+            subscribers.remove(self)
+            print 'removed', self
 
 
 class ControlServer(asyncore.dispatcher):
