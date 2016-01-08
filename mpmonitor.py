@@ -183,6 +183,7 @@ def do_main_program(stations):
         Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
         Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
         Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
+        Station('Linn Classical', 'http://89.16.185.174:8004/stream')
         Station('WQXR', 'http://stream.wqxr.org/wqxr')
         Station('WGBH', 'http://audio.wgbh.org:8004')
 
