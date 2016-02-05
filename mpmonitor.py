@@ -71,7 +71,7 @@ class Station:
 
 
 class Player:
-    def __init__(self):
+    def __init__(self, parms):
         # Set up variables we make visible
         self.title = ''
         self.icy = {}
@@ -79,7 +79,10 @@ class Player:
         self.player = AsyncPlayer(autospawn=False)
 
         # Setup additional args
-        self.player.args = ['-quiet', '-msglevel', 'all=0:identify=6:demuxer=6']
+        self.player.args = ['-quiet',
+                            '-msgcharset', parms.charset,
+                            '-msglevel', 'all=0:identify=6:demuxer=6']
+        print self.player.args
 
         # hook a subscriber to Mplayer's stdout
         self.player.stdout.connect(self.handle_data)
@@ -121,7 +124,9 @@ class Player:
                         (name,value) = c.split('=',1)
                         name = name.strip()
                         value = value[1:].rstrip()
-                        self.icy[name] = value
+                        self.icy[name] = value.decode('utf8')
+                        self.icy['hex' + name] = value.encode('hex')
+                        self.icy['raw' + name] = value
                         if name.lower() == 'streamtitle':
                             self.title = value
                         if name.lower() == 'streamurl' and '&' in value:
@@ -131,7 +136,7 @@ class Player:
                             for p in parts:
                                 if '=' in p:
                                     (name, value) = p.split('=',1)
-                                    self.icy[name] = urllib.unquote(value).decode('utf8')
+                                    self.icy[name] = urllib.unquote(value)
                                 else:
                                     print "no = in: ", p
             except Exception, err:
@@ -149,6 +154,7 @@ class Player:
                 each.outbuf += ans + '\n'
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
             self.player.loadfile(Station.current().url)
+        sys.stdout.flush()
 
 
 class Controller(asyncore.dispatcher):
@@ -158,8 +164,9 @@ class Controller(asyncore.dispatcher):
         self.player = player
         self.pp = player.player
         self.buffer = ''
-        self.outbuf = ''
+        self.outbuf = '"playing":%s\n' % repr(Station.current()) 
         print("accepted from", client_address)
+        sys.stdout.flush()
         # Hook ourselves into the dispatch loop
         subscribers.append(self)
         asyncore.dispatcher.__init__(self, self.sock)
@@ -197,8 +204,10 @@ class Controller(asyncore.dispatcher):
                     self.pp.loadfile(Station.prev().url)
                 elif line.startswith('stat'):
                     resp.append('"stationlist":%s' % Station.stations())
-                #resp.append('"playing":%s' % repr(Station.current()))
+                else:
+                    resp.append('"playing":%s' % repr(Station.current()))
                 self.outbuf += '{%s}' % ',\n'.join(resp) + '\n'
+                sys.stdout.flush()
         else:
             self.close()
     
@@ -206,6 +215,7 @@ class Controller(asyncore.dispatcher):
         if self in subscribers:
             subscribers.remove(self)
             print 'removed', self
+            sys.stdout.flush()
 
 
 class ControlServer(asyncore.dispatcher):
@@ -228,7 +238,7 @@ class ControlServer(asyncore.dispatcher):
         
 
 def do_main_program(stations):
-    player = Player()
+    player = Player(parms)
     server = ControlServer(player)
     if len(stations) > 0:
         for i in xrange(len(stations)):
@@ -246,6 +256,7 @@ def do_main_program(stations):
 
     # play the first station
     print Station.current()
+    sys.stdout.flush()
     player.player.loadfile(Station.current().url)
     # run the asyncore event loop
     asyncore.loop()
@@ -257,16 +268,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--nodaemon', dest='daemon', action='store_false')
     parser.add_argument('--daemon', dest='daemon', action='store_true')
+    parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
     parser.add_argument('sources', metavar='stations', type=str, nargs='*',
             help='Sources to play (in order).  Default is internal list.')
     parms = parser.parse_args()
-
+    if parms.sources:
+        parms.daemon = False
     if parms.daemon:
         sys.stderr.close()
         sys.stderr = open('/home/david/src/radio/errlog.txt', 'a')
         sys.stdout.close()
         sys.stdout = open('/home/david/src/radio/log.txt', 'a')
-        with daemon.DaemonContext(working_directory="/home/david/src/radio",initgroups=False):
+        with daemon.DaemonContext(working_directory="/home/david/src/radio",stdout=sys.stdout,stderr=sys.stderr,initgroups=False):
             do_main_program(parms.sources)
     else:
         do_main_program(parms.sources)
