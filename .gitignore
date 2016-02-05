@@ -52,4 +52,5 @@ Thumbs.db
 # Editor files #
 # *.*~
 
-
+dlog.txt
+*.pid

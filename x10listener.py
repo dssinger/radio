@@ -2,18 +2,14 @@
 
 import sys
 from mysocket import *
+import socket
 
 def sendcmd(cmd):
-    sock = mysocket()
-    sock.connect(('radio.local', 6600))
+    # We don't care about replies, so just blast it and close
+    print "sending %s" % cmd; sys.stdout.flush()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('radio.local', 6601))
     sock.send(cmd + '\n')
-    print "sent %s" % cmd; sys.stdout.flush()
-    resp = sock.readline()
-    print "back from readline, resp = '%s'" % resp; sys.stdout.flush()
-    while resp != '' and resp != 'OK' and not resp.startswith('ACK '):
-        print resp; sys.stdout.flush(); 
-        resp = sock.readline()
-    print 'ready to close socket'; sys.stdout.flush()
     sock.close()
 
 
