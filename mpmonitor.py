@@ -4,10 +4,15 @@ import re
 import sys
 import urllib
 import socket
+import time
 from mplayer.async import AsyncPlayer
+import json
+
+subscribers = []       # Connections which care
 
 class Station:
     stationlist = []
+    stationdir = {}
     stationpos = 0
 
     @classmethod
@@ -28,20 +33,48 @@ class Station:
     def current(self):
         return self.stationlist[self.stationpos]
 
+    @classmethod
+    def select(self, what):
+        try:
+            pos = int(what)
+            if (pos > 0) and (pos < len(self.stationlist)):
+                self.stationpos = pos
+        except ValueError:
+            if what in self.stationdir:
+                self.stationpos = self.stationdir[what].pos
+        return self.stationlist[self.stationpos]
+
+    @classmethod
+    def stations(self):
+        ret = []
+        for s in self.stationlist:
+            ret.append(repr(s))
+        return '[%s]' % ','.join(ret)
+        
+
     def __init__(self, label, url):
         self.label = label
         self.url = url
         self.pos = len(self.stationlist)
         self.stationlist.append(self)
+        self.stationdir[label] = self
 
     def __repr__(self):
-        return '%d: %s\n   %s' % (self.pos, self.label, self.url)
+        return '{"pos":%d,"label":"%s","url":"%s"}' % (self.pos, self.label, self.url)
         
+    def json(self):
+        ans = {}
+        ans['pos'] = self.pos
+        ans['label'] = self.label
+        ans['url'] = self.url
+        return ans
+
 
 class Player:
     def __init__(self):
         # Set up variables we make visible
         self.title = ''
+        self.icy = {}
         # Don't autospawn because we want to setup the args later
         self.player = AsyncPlayer(autospawn=False)
 
@@ -54,48 +87,68 @@ class Player:
         # Manually spawn the Mplayer process
         self.player.spawn()
 
+        # Monkey patch a handle_error event into the player
+        self.player.stdout._dispatcher.handle_error = self.handle_error
+
+    def handle_error(self):
+        (t, v, db) = sys.exc_info()
+        sys.stderr.write(repr(v))
+        sys.stderr.write('\n')
+        sys.stderr.write(repr(t))
+        sys.stderr.write('\n')
+        sys.stderr.write(repr(db))
+        sys.stderr.write('\n')
+        return
+
     def __repr__(self):
         ret = []
         ret.append('"title":"%s"' % self.title)
         ret.append('"icyinfo":"%s"' % repr(self.icy))
-        ret.append('"paused":"%s"' % self.player.paused)
         ret.append('"metadata":"%s"' % self.player.metadata)
+        ret.append('"paused":"%s"' % self.player.paused)
         return '{' + ',\n'.join(ret) + '}'
 
-    def handle_data(self, data):
-        if not data.startswith('EOF code'):
-            print('log: %s' % (data, ))
-            if data.startswith('ICY Info:'):
-                    
-                start = "StreamTitle='"
-                end = "';"
 
-                try: 
-                    content = data.replace('ICY Info:','').split("';")
-                    self.icy = {}
-                    for c in content:
-                        if '=' in c:
-                            (name,value) = c.split('=',1)
-                            value = value[1:].rstrip()
+    def handle_data(self, line):
+        # Called one line at a time by mplayer.py
+        print '%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), line )
+        if line.startswith('ICY Info:'):
+            try: 
+                content = line.replace('ICY Info:','').split("';")
+                self.icy = {}
+                for c in content:
+                    if '=' in c:
+                        (name,value) = c.split('=',1)
+                        name = name.strip()
+                        value = value[1:].rstrip()
+                        self.icy[name] = value
+                        if name.lower() == 'streamtitle':
+                            self.title = value
+                        if name.lower() == 'streamurl' and '&' in value:
+                            (value, rest) = value.split('&', 1)
                             self.icy[name] = value
-                            if name.lower() == 'streamtitle':
-                                self.title = value
-                            if name.lower() == 'streamurl' and '&' in value:
-                                (value, rest) = value.split('&', 1)
-                                self.icy[name] = value
-                                parts = rest.split('&')
-                                for p in parts:
-                                    if '=' in p:
-                                        (name, value) = p.split('=',1)
-                                        self.icy[name] = urllib.unquote(value).decode('utf8')
-                                    else:
-                                        print "no = in: ", p
-                except Exception, err:
-                    print "songtitle error: " + str(err)
-                    self.title = content.split("'")[1]
-                print self.icy
-        else:
-            self.player.quit()
+                            parts = rest.split('&')
+                            for p in parts:
+                                if '=' in p:
+                                    (name, value) = p.split('=',1)
+                                    self.icy[name] = urllib.unquote(value).decode('utf8')
+                                else:
+                                    print "no = in: ", p
+            except Exception, err:
+                print "songtitle error: " + str(err)
+                self.title = content.split("'")[1]
+            print self.icy
+            info = {}
+            info['icy'] = self.icy
+            info['station'] = Station.current().json()
+            ans = json.dumps(info)
+            print ans
+            with open('status.json', 'w') as outfile:
+                outfile.write(ans)
+            for each in subscribers:
+                each.outbuf += ans + '\n'
+        elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
+            self.player.loadfile(Station.current().url)
 
 
 class Controller(asyncore.dispatcher):
@@ -105,37 +158,54 @@ class Controller(asyncore.dispatcher):
         self.player = player
         self.pp = player.player
         self.buffer = ''
+        self.outbuf = ''
         print("accepted from", client_address)
         # Hook ourselves into the dispatch loop
+        subscribers.append(self)
         asyncore.dispatcher.__init__(self, self.sock)
 
+    def readable(self):
+        return True     # Always willing to read
+
+    def writeable(self):
+        return len(self.outbuf) > 0
+
+    def handle_write(self):
+        sent = self.send(self.outbuf)
+        self.outbuf = self.outbuf[sent:]
+    
     def handle_read(self):
         data = self.recv(1024)
         if data:
             self.buffer += data
+            resp = []
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
                 print 'Command: "%s"' % line
-                print 'paused = ', self.pp.paused
-                if line[0] == 'q':
+                if line.startswith('quit'):
                     sys.exit()
-                elif line.startswith('stop') and not self.pp.paused:
+                elif line.startswith('pause'):
                     self.pp.pause()
-                    print 'paused => ', self.pp.paused
-                elif line.startswith('play') and self.pp.paused:
-                    self.pp.pause()
-                    print 'paused => ', self.pp.paused
+                elif line.startswith('stop'):
+                    self.pp.stop()
+                elif line.startswith('play'):
+                    rest = line[5:]
+                    self.pp.loadfile(Station.select(rest).url)
                 elif line.startswith('next'):
                     self.pp.loadfile(Station.next().url)
-                    if self.pp.paused:
-                        self.pp.pause()
                 elif line.startswith('prev'):
                     self.pp.loadfile(Station.prev().url)
-                    if self.pp.paused:
-                        self.pp.pause()
-                self.send(repr(Station.current()) + '\n')            
-                print repr(self.player) 
+                elif line.startswith('stat'):
+                    resp.append('"stationlist":%s' % Station.stations())
+                #resp.append('"playing":%s' % repr(Station.current()))
+                self.outbuf += '{%s}' % ',\n'.join(resp) + '\n'
+        else:
+            self.close()
     
+    def handle_close(self):
+        if self in subscribers:
+            subscribers.remove(self)
+            print 'removed', self
 
 
 class ControlServer(asyncore.dispatcher):
@@ -150,31 +220,54 @@ class ControlServer(asyncore.dispatcher):
         self.player = player
         print "listening on port", self.port
 
+
     def handle_accept(self):
         channel, addr = self.accept()
         self.handlerClass(channel, addr, self.player)
+        player = self.player
+        
 
-def do_main_program():
+def do_main_program(stations):
     player = Player()
     server = ControlServer(player)
-    # Define the stations
-    Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
-    Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
-    Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
-    Station('WQXR', 'http://stream.wqxr.org/wqxr')
-    Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
-    Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
-    Station('WGBH', 'http://audio.wgbh.org:8004')
-
-    # play a stream
-    if len(sys.argv) > 1:
-        player.player.loadfile(sys.argv[1])
+    if len(stations) > 0:
+        for i in xrange(len(stations)):
+            Station('%d' % i, stations[i])
     else:
-        player.player.loadfile(Station.current().url)
+        # Define the stations
+        Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
+        Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
+        Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
+        Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
+        Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
+        Station('Linn Classical', 'http://89.16.185.174:8004/stream')
+        Station('WQXR', 'http://stream.wqxr.org/wqxr')
+        Station('WGBH', 'http://audio.wgbh.org:8004')
+
+    # play the first station
+    print Station.current()
+    player.player.loadfile(Station.current().url)
     # run the asyncore event loop
     asyncore.loop()
 
 if __name__ == "__main__":
-    do_main_program()
-    
+    import daemon
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nodaemon', dest='daemon', action='store_false')
+    parser.add_argument('--daemon', dest='daemon', action='store_true')
+    parser.add_argument('sources', metavar='stations', type=str, nargs='*',
+            help='Sources to play (in order).  Default is internal list.')
+    parms = parser.parse_args()
+
+    if parms.daemon:
+        sys.stderr.close()
+        sys.stderr = open('/home/david/src/radio/errlog.txt', 'a')
+        sys.stdout.close()
+        sys.stdout = open('/home/david/src/radio/log.txt', 'a')
+        with daemon.DaemonContext(working_directory="/home/david/src/radio",initgroups=False):
+            do_main_program(parms.sources)
+    else:
+        do_main_program(parms.sources)
 
