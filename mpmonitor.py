@@ -81,6 +81,7 @@ class Player:
         # Setup additional args
         self.player.args = ['-quiet',
                             '-msgcharset', parms.charset,
+                            '-ao', 'alsa:device=hw=1.0',
                             '-msglevel', 'all=0:identify=6:demuxer=6']
         print self.player.args
 
@@ -262,24 +263,42 @@ def do_main_program(stations):
     asyncore.loop()
 
 if __name__ == "__main__":
-    import daemon
-    import sys
+    import daemon, daemon.pidfile, os
+    import sys, pwd
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--nodaemon', dest='daemon', action='store_false')
     parser.add_argument('--daemon', dest='daemon', action='store_true')
     parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
+    parser.add_argument('--user', default='david', type=str)
+    parser.add_argument('--pidfile', default='mpmonitor.pid', type=str)
+    parser.add_argument('--workdir', default='src/radio', type=str)
     parser.add_argument('sources', metavar='stations', type=str, nargs='*',
             help='Sources to play (in order).  Default is internal list.')
     parms = parser.parse_args()
+    if parms.user:
+        user = pwd.getpwnam(parms.user)
+        uid = user.pw_uid
+        gid = user.pw_gid
+        homedir = user.pw_dir
+    else:
+        uid = os.getuid()
+        gid = os.getgid()
+        homedir = '/'
+    workdir = os.path.join(homedir, parms.workdir)
+
     if parms.sources:
         parms.daemon = False
     if parms.daemon:
         sys.stderr.close()
-        sys.stderr = open('/home/david/src/radio/errlog.txt', 'a')
+        sys.stderr = open(os.path.join(workdir, 'errlog.txt'), 'a')
         sys.stdout.close()
-        sys.stdout = open('/home/david/src/radio/log.txt', 'a')
-        with daemon.DaemonContext(working_directory="/home/david/src/radio",stdout=sys.stdout,stderr=sys.stderr,initgroups=False):
+        sys.stdout = open(os.path.join(workdir, 'log.txt'), 'a')
+        if parms.pidfile:
+            pidfile = daemon.pidfile.PIDLockFile(os.path.join(workdir, parms.pidfile))
+        else:
+            pidfile = None
+        with daemon.DaemonContext(working_directory=workdir,stdout=sys.stdout,stderr=sys.stderr,pidfile=pidfile,uid=uid,gid=gid,initgroups=False):
             do_main_program(parms.sources)
     else:
         do_main_program(parms.sources)
