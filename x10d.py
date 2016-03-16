@@ -13,6 +13,7 @@ workdir = os.path.join(user.pw_dir,'src/radio')
 pidfile = os.path.join(workdir,'x10d.pid')
 uid = user.pw_uid
 gid = user.pw_gid
+sys.stdout.close()
 logf = open(os.path.join(workdir, 'dlog.txt'),'a')
 
 with daemon.DaemonContext(stdout=logf,working_directory=workdir,pidfile=daemon.pidfile.PIDLockFile(pidfile),uid=uid,gid=gid):

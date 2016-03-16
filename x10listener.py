@@ -46,6 +46,8 @@ def handlex10line(l,s):
 
 
 def do_main_program():
+    sys.stdout.close()
+    sys.stdout = open('/home/david/src/radio/xlog.txt', 'a')
     s = mysocket()
     s.connect(('localhost', 1099))    # Connect to the X10 via mochad
     l = s.readline()
