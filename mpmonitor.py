@@ -79,9 +79,8 @@ class Player:
         self.player = AsyncPlayer(autospawn=False)
 
         # Setup additional args
-        self.player.args = ['-quiet',
+        self.player.args = [
                             '-msgcharset', parms.charset,
-                            '-ao', 'alsa:device=hw=1.0',
                             '-msglevel', 'all=0:identify=6:demuxer=6']
         print self.player.args
 
@@ -154,6 +153,9 @@ class Player:
             for each in subscribers:
                 each.outbuf += ans + '\n'
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
+            print '*** EOF ***'
+            print 'Station.current().url)', Station.current().url
+            print '*** Reloading ***'
             self.player.loadfile(Station.current().url)
         sys.stdout.flush()
 
@@ -166,7 +168,7 @@ class Controller(asyncore.dispatcher):
         self.pp = player.player
         self.buffer = ''
         self.outbuf = '"playing":%s\n' % repr(Station.current()) 
-        print("accepted from", client_address)
+        print '%s accepted from %s' % (time.strftime('%Y-%m-%d %H:%M:%S'),client_address )
         sys.stdout.flush()
         # Hook ourselves into the dispatch loop
         subscribers.append(self)
@@ -189,7 +191,7 @@ class Controller(asyncore.dispatcher):
             resp = []
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
-                print 'Command: "%s"' % line
+                print '%s Command: "%s"' % (time.strftime('%Y-%m-%d %H:%M:%S'),line)
                 if line.startswith('quit'):
                     sys.exit()
                 elif line.startswith('pause'):
@@ -230,6 +232,7 @@ class ControlServer(asyncore.dispatcher):
         self.handlerClass = handlerClass
         self.player = player
         print "listening on port", self.port
+        sys.stdout.flush()
 
 
     def handle_accept(self):
@@ -246,7 +249,7 @@ def do_main_program(stations):
             Station('%d' % i, stations[i])
     else:
         # Define the stations
-        Station('KDFC', 'http://8343.live.streamtheworld.com/KDFCFMAAC_SC')
+        Station('KDFC', 'http://8333.live.streamtheworld.com:80/KDFCFM_SC')
         Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
         Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
         Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
@@ -272,7 +275,7 @@ if __name__ == "__main__":
     parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
     parser.add_argument('--user', default='david', type=str)
     parser.add_argument('--pidfile', default='mpmonitor.pid', type=str)
-    parser.add_argument('--workdir', default='src/radio', type=str)
+    parser.add_argument('--workdir', default='/home/david/src/radio', type=str)
     parser.add_argument('sources', metavar='stations', type=str, nargs='*',
             help='Sources to play (in order).  Default is internal list.')
     parms = parser.parse_args()
