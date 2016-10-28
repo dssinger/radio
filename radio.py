@@ -272,24 +272,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
-    parser.add_argument('--user', default='david', type=str)
-    parser.add_argument('--workdir', default='radiologs', type=str)
     parser.add_argument('sources', metavar='stations', type=str, nargs='*',
             help='Sources to play (in order).  Default is internal list.')
+    parser.add_argument('--outfile', type=str, default='')
     parms = parser.parse_args()
-    if parms.user:
-        user = pwd.getpwnam(parms.user)
-        uid = user.pw_uid
-        gid = user.pw_gid
-        homedir = user.pw_dir
-        #os.setgid(gid)
-        #os.setuid(uid)
-    else:
-        uid = os.getuid()
-        gid = os.getgid()
-        homedir = '/'
-    workdir = os.path.join(homedir, parms.workdir)
-    os.chdir(workdir)
-
+    if parms.outfile:
+        sys.stdout.close()
+        sys.stdout = open(parms.outfile, 'a')
     do_main_program(parms.sources)
 
