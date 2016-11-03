@@ -269,6 +269,7 @@ def do_main_program(stations):
 if __name__ == "__main__":
     import os
     import sys, pwd
+    import time
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
@@ -276,6 +277,7 @@ if __name__ == "__main__":
             help='Sources to play (in order).  Default is internal list.')
     parser.add_argument('--outfile', type=str, default='')
     parms = parser.parse_args()
+    time.sleep(10)
     if parms.outfile:
         sys.stdout.close()
         sys.stdout = open(parms.outfile, 'a')
