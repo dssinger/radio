@@ -59,7 +59,7 @@ def do_main_program():
     env = Environment(with_discovery=False,with_subscribers=False)
     env.start()
     env.discover(seconds=3)
-    switch = env.get_switch('streaming')
+    switch = env.get_switch('audio')
     s = mysocket()
     s.connect(('localhost', 1099))    # Connect to the X10 via mochad
     l = s.readline()
