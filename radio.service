@@ -1,0 +1,16 @@
+[Unit]
+Description=Radio Player
+After=default.target
+
+[Service]
+User=david
+ExecStart=/home/david/src/radio/radio.py --outfile log.txt --delay 10
+WorkingDirectory=/home/david/src/radio/logs
+StandardInput=null
+Restart=always
+RestartPreventExitStatus=SIGKILL 9
+Environment="TERM=dumb"
+
+[Install]
+WantedBy=default.target
+Alias=radio.service
