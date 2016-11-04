@@ -188,22 +188,9 @@ class ControlServer(asyncore.dispatcher):
         player = self.player
         
 
-def do_main_program(stations):
+def do_main_program():
     player = Player(parms)
     server = ControlServer(player)
-    if len(stations) > 0:
-        for i in xrange(len(stations)):
-            Station('%d' % i, stations[i])
-    else:
-        # Define the stations
-        Station('KDFC', 'http://8353.live.streamtheworld.com:80/KDFCFMAAC2_SC')
-        Station('Venice Classical Radio', 'http://174.36.206.197:8000/stream')
-        Station('Radio Swiss Classic', 'http://stream.srg-ssr.ch/m/rsc_de/aacp_96')
-        Station('BBC Radio 3', 'http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio3_mf_p?s=1449788045&e=1449802445&h=30697f7cb4a7a30b994f677063a26493')
-        Station('Dutch Radio 4', 'http://icecast.omroep.nl/radio4-bb-mp3')
-        Station('Linn Classical', 'http://89.16.185.174:8004/stream')
-        Station('WQXR', 'http://stream.wqxr.org/wqxr')
-        Station('WGBH', 'http://audio.wgbh.org:8004')
 
     # play the first station
     log(Station.current())
@@ -219,8 +206,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--charset', metavar='charset', type=str, default='utf-8')
-    parser.add_argument('sources', metavar='stations', type=str, nargs='*',
-            help='Sources to play (in order).  Default is internal list.')
     parser.add_argument('--outfile', type=str, default='')
     parser.add_argument('--delay', type=int, default=0)
     parms = parser.parse_args()
@@ -229,5 +214,5 @@ if __name__ == "__main__":
     if parms.outfile:
         sys.stdout.close()
         sys.stdout = open(parms.outfile, 'a')
-    do_main_program(parms.sources)
+    do_main_program()
 
