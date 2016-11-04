@@ -54,3 +54,4 @@ Thumbs.db
 
 dlog.txt
 *.pid
+logs/
