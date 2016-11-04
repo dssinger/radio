@@ -69,6 +69,9 @@ class Station:
         ans['url'] = self.url
         return ans
 
+def log(line):
+    print '%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), line )
+    sys.stdout.flush()
 
 class Player:
     def __init__(self, parms):
@@ -83,7 +86,7 @@ class Player:
                             '-msgcharset', parms.charset,
                             '-noconsolecontrols',
                             '-msglevel', 'all=0:identify=6:demuxer=6']
-        print self.player.args
+        log(self.player.args)
 
         # hook a subscriber to Mplayer's stdout
         self.player.stdout.connect(self.handle_data)
@@ -115,7 +118,6 @@ class Player:
 
     def handle_data(self, line):
         # Called one line at a time by mplayer.py
-        print '%s %s' % (time.strftime('%Y-%m-%d %H:%M:%S'), line )
         if line.startswith('ICY Info:'):
             try: 
                 content = line.replace('ICY Info:','').split("';")
@@ -139,25 +141,27 @@ class Player:
                                     (name, value) = p.split('=',1)
                                     self.icy[name] = urllib.unquote(value)
                                 else:
-                                    print "no = in: ", p
+                                    log("no = in: " +  p)
             except Exception, err:
-                print "songtitle error: " + str(err)
+                log("songtitle error: " + str(err))
                 self.title = content.split("'")[1]
-            print self.icy
+            log(self.icy)
             info = {}
             info['icy'] = self.icy
             info['station'] = Station.current().json()
             ans = json.dumps(info)
-            print ans
+            log(ans)
             with open('status.json', 'w') as outfile:
                 outfile.write(ans)
             for each in subscribers:
                 each.outbuf += ans + '\n'
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
-            print '*** EOF ***'
-            print 'Station.current().url)', Station.current().url
-            print '*** Reloading ***'
+            log('*** EOF ***')
+            log('Station.current().url: ' + Station.current().url)
+            log('*** Reloading ***')
             self.player.loadfile(Station.current().url)
+        elif line.startswith('ID_FILENAME') or not line.startswith('ID_'):
+            log(line)
         sys.stdout.flush()
 
 
@@ -169,7 +173,7 @@ class Controller(asyncore.dispatcher):
         self.pp = player.player
         self.buffer = ''
         self.outbuf = '"playing":%s\n' % repr(Station.current()) 
-        print '%s accepted from %s' % (time.strftime('%Y-%m-%d %H:%M:%S'),client_address )
+        log('accepted from %s' % repr(client_address))
         sys.stdout.flush()
         # Hook ourselves into the dispatch loop
         subscribers.append(self)
@@ -192,7 +196,7 @@ class Controller(asyncore.dispatcher):
             resp = []
             while '\n' in data:
                 (line, data) = data.split('\n', 1)
-                print '%s Command: "%s"' % (time.strftime('%Y-%m-%d %H:%M:%S'),line)
+                log('Command: "%s"' % line)
                 if line.startswith('quit'):
                     sys.exit()
                 elif line.startswith('pause'):
@@ -218,7 +222,7 @@ class Controller(asyncore.dispatcher):
     def handle_close(self):
         if self in subscribers:
             subscribers.remove(self)
-            print 'removed', self
+            log('removed ' + repr(self))
             sys.stdout.flush()
 
 
@@ -232,7 +236,7 @@ class ControlServer(asyncore.dispatcher):
         self.listen(5)
         self.handlerClass = handlerClass
         self.player = player
-        print "listening on port", self.port
+        log("listening on port %s" % self.port)
         sys.stdout.flush()
 
 
@@ -260,7 +264,7 @@ def do_main_program(stations):
         Station('WGBH', 'http://audio.wgbh.org:8004')
 
     # play the first station
-    print Station.current()
+    log(Station.current())
     sys.stdout.flush()
     player.player.loadfile(Station.current().url)
     # run the asyncore event loop
@@ -276,8 +280,10 @@ if __name__ == "__main__":
     parser.add_argument('sources', metavar='stations', type=str, nargs='*',
             help='Sources to play (in order).  Default is internal list.')
     parser.add_argument('--outfile', type=str, default='')
+    parser.add_argument('--delay', type=int, default=0)
     parms = parser.parse_args()
-    time.sleep(10)
+    if parms.delay:
+        time.sleep(parms.delay)
     if parms.outfile:
         sys.stdout.close()
         sys.stdout = open(parms.outfile, 'a')
