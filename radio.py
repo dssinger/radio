@@ -36,8 +36,12 @@ class Player:
         # Manually spawn the Mplayer process
         self.player.spawn()
 
-        # Monkey patch a handle_error event into the player
-        self.player.stdout._dispatcher.handle_error = self.handle_error
+    def load_station(self, station):
+        log('%s: %s' % ('list' if station.islist else 'file', station.url))
+        if station.islist:
+            self.player.loadlist(station.url)
+        else:
+            self.player.loadfile(station.url)
 
     def handle_error(self):
         (t, v, db) = sys.exc_info()
@@ -100,8 +104,12 @@ class Player:
         elif line.startswith('ID_EXIT') or line.startswith('ds_fill_buffer'):
             log('*** EOF ***')
             log('Station.current().url: ' + Station.current().url)
+            log('islist = ' + repr(Station.current().islist))
             log('*** Reloading ***')
-            self.player.loadfile(Station.current().url)
+            if not Station.current().islist:
+                self.player.loadfile(Station.current().url)
+            else:
+                self.player.loadlist(Station.current().url)
         elif line.startswith('ID_FILENAME') or not line.startswith('ID_'):
             log(line)
         sys.stdout.flush()
@@ -147,11 +155,11 @@ class Controller(asyncore.dispatcher):
                     self.pp.stop()
                 elif line.startswith('play'):
                     rest = line[5:]
-                    self.pp.loadfile(Station.select(rest).url)
+                    self.player.load_station(Station.select(rest))
                 elif line.startswith('next'):
-                    self.pp.loadfile(Station.next().url)
+                    self.player.load_station(Station.next())
                 elif line.startswith('prev'):
-                    self.pp.loadfile(Station.prev().url)
+                    self.player.load_station(Station.prev())
                 elif line.startswith('stat'):
                     resp.append('"stationlist":%s' % Station.stations())
                 else:
@@ -174,6 +182,7 @@ class ControlServer(asyncore.dispatcher):
         self.port = port
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.set_reuse_addr()
+        self.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.bind(("", port))
         self.listen(5)
         self.handlerClass = handlerClass
@@ -195,7 +204,7 @@ def do_main_program():
     # play the first station
     log(Station.current())
     sys.stdout.flush()
-    player.player.loadfile(Station.current().url)
+    player.load_station(Station.current())
     # run the asyncore event loop
     asyncore.loop()
 
@@ -215,4 +224,5 @@ if __name__ == "__main__":
         sys.stdout.close()
         sys.stdout = open(parms.outfile, 'a')
     do_main_program()
+
 
