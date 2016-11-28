@@ -255,6 +255,7 @@ mpdcontroller = MPDController()
 mpdcontroller.idle()
 
 serv = mysocket(reader=handle_incoming_connection)
+serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 serv.bind(('0.0.0.0', MYPORT))
 serv.listen(5)
 
